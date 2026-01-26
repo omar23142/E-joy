@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Joy Extension Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        video {
+            width: 100%;
+            max-width: 600px;
+            background: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>E-Joy Clone Extension Test</h1>
+
+    <div class="test-section">
+        <h2>1. Video Overlay Test</h2>
+        <p>Play the video below. You should see the translation overlay appear automatically.</p>
+        <!-- Sample video from Blender Foundation -->
+        <video id="test-video" controls crossorigin="anonymous">
+            <source src="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <p><em>Note: The mock subtitles are time-based (0-20 seconds).</em></p>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Word Lookup Test (Bubble)</h2>
+        <p>Select any of the words below to see the "E" bubble icon:</p>
+        <ul>
+            <li><strong>SQL</strong> - Select this word to see the "geek speak" definition.</li>
+            <li><strong>Indexing</strong> - Select this to see the indexing definition.</li>
+            <li><strong>Database</strong> - Select this for a default definition.</li>
+        </ul>
+        <p>
+            Try selecting this sentence: "I strictly use SQL for my backend."
+        </p>
+    </div>
+
+</body>
+
+</html>

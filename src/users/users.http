@@ -1,0 +1,85 @@
+### all user
+Get http://localhost:3000/api/v1/users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+Get http://localhost:3000/api/v1/users/3
+
+###
+Get http://localhost:3000/api/v1/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+### patch update logedin user
+PATCH  http://localhost:3000/api/v1/users/updateMe
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY0ODQxMDAxLCJleHAiOjE3NjQ5Mjc0MDF9.sg8UANwW_HWWAvjFhIOx32pzizI0M8XKBwcAdj2Z4pM
+
+{
+    "userName":"newomar",
+    "email":"newomar@mail.com",
+    "password":"123456788",
+    "passwordConf":"123456788"
+    //"rating":1
+}
+
+### post
+Post http://localhost:3000/api/v1/users
+Content-Type: application/json
+
+{
+    "name":"carry",
+    "price":2
+    //"rating":1
+}
+###
+Post http://localhost:3000/api/v1/users/auth/signup
+Content-Type: application/json
+
+{
+     "userName":"omar",
+    "email":"omar@mail.com",
+    "password":"123456788",
+    "passwordConf":"123456788",
+    "photo":"omaralmPhoto.jpg",
+    "nativeLanguage":"ar",
+    "targetLanguage":"en"
+
+
+}
+
+###
+Post http://localhost:3000/api/v1/users/auth/signin
+Content-Type: application/json
+
+{
+    
+    "email":"omar@mail.com",
+    "password":"123456788"
+}
+
+###
+Post http://localhost:3000/api/v1/users/forget-password
+Content-Type: application/json
+
+{
+    
+    "email":"ahmad@mail.com"
+    
+}
+
+
+### patch
+PATCH http://localhost:3000/api/v1/users/3
+Content-Type: application/json
+
+{
+    "name":"new name",
+    "price":39,
+    "rating":3
+}
+
+### delete
+DELETE  http://localhost:3000/api/v1/users/deletMe
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY1Mjc3NzA4fQ.OYMvTPSeeegCqYSpWB2SWryR_Onyj52zgdz5p14rih4
+

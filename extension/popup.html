@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Joy Translator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-translate">Translate</button>
+    <button class="tab-btn" id="tab-list">My List</button>
+  </div>
+
+  <div class="container">
+    
+    <!-- Translate View -->
+    <div id="translate-view">
+      <div class="card">
+        <textarea id="input-text" placeholder="Enter text to translate..."></textarea>
+      </div>
+      
+      <button id="translate-btn" class="btn">
+        <span class="btn-text">Translate</span>
+        <div class="loader" id="loader"></div>
+      </button>
+
+      <div class="card result-area" id="result-area">
+        <div class="result-label">English</div>
+        <div class="word-original" id="display-original" style="margin-bottom: 8px;"></div>
+        
+        <div class="result-label">Arabic</div>
+        <div class="result-text" id="display-translated"></div>
+        
+        <button id="add-btn" class="btn btn-secondary">
+          + Add to List
+        </button>
+      </div>
+    </div>
+
+    <!-- List View -->
+    <div id="list-view" class="card">
+      <div id="words-container">
+        <!-- Words will be injected here -->
+      </div>
+      <div id="empty-state" class="empty-state" style="display: none;">
+        No words saved yet.
+      </div>
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

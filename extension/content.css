@@ -1,0 +1,292 @@
+/* Video Overlay Styles */
+.ejoy-video-overlay {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 100px;
+    /* Higher from bottom to avoid video controls */
+    pointer-events: none;
+    z-index: 2147483647;
+    /* Max z-index */
+    transition: opacity 0.3s ease;
+    text-align: center;
+    /* Ensure it stays on top in fullscreen */
+    left: 0;
+    top: 0;
+}
+
+/* Subtitle Box Container */
+.ejoy-subtitle-box {
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    max-width: 90%;
+    pointer-events: auto;
+    cursor: grab;
+    user-select: none;
+    position: relative;
+}
+
+.ejoy-subtitle-box.dragging {
+    cursor: grabbing;
+    opacity: 0.9;
+}
+
+.ejoy-subtitle-original {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    line-height: 1.5;
+    pointer-events: auto;
+}
+
+.ejoy-word-span {
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 2px 4px;
+    transition: all 0.15s ease;
+    display: inline-block;
+    color: #ffffff;
+    pointer-events: auto;
+}
+
+/* Higher specificity for hover state */
+.ejoy-subtitle-original .ejoy-word-span:hover {
+    background-color: rgba(255, 215, 0, 0.95) !important;
+    color: #000000 !important;
+    text-shadow: none;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.5);
+    position: relative;
+    z-index: 10;
+}
+
+.ejoy-subtitle-translated {
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #ffd700;
+    direction: rtl;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+/* Bubble Icon */
+.ejoy-bubble-btn {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background-color: #2b2b2b;
+    border: 2px solid #ffd700;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    color: #ffd700;
+    font-weight: 800;
+    font-size: 18px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.ejoy-bubble-btn:hover {
+    transform: scale(1.2);
+}
+
+/* Popup Card - Modern & Tabbed */
+.ejoy-popup-card {
+    position: absolute;
+    width: 320px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    z-index: 2147483647;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    color: #333;
+    animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Header */
+.ejoy-popup-header {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-bottom: 1px solid #ebebeb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ejoy-word-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #2c3e50;
+    letter-spacing: -0.5px;
+}
+
+.ejoy-popup-close {
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #95a5a6;
+    transition: all 0.2s;
+}
+
+.ejoy-popup-close:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+/* Tabs Navigation */
+.ejoy-tabs-nav {
+    display: flex;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    padding: 0 8px;
+}
+
+.ejoy-tab-btn {
+    flex: 1;
+    padding: 12px 5px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7f8c8d;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+.ejoy-tab-btn:hover {
+    color: #34495e;
+}
+
+.ejoy-tab-btn.active {
+    color: #e67e22;
+    /* Branding color */
+    border-bottom-color: #e67e22;
+}
+
+/* Tab Content */
+.ejoy-tab-content {
+    padding: 16px;
+    min-height: 120px;
+}
+
+.ejoy-tab-pane {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.ejoy-tab-pane.active {
+    display: block;
+}
+
+/* Details Typography */
+.ejoy-detail-item {
+    margin-bottom: 12px;
+}
+
+.ejoy-label-sm {
+    font-size: 11px;
+    color: #95a5a6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.ejoy-main-translation {
+    font-size: 24px;
+    color: #e67e22;
+    font-weight: bold;
+    direction: rtl;
+    line-height: 1.2;
+}
+
+.ejoy-text-content {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #34495e;
+}
+
+.ejoy-context-box {
+    background: #fdf2e9;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 3px solid #e67e22;
+    font-style: italic;
+    color: #5d4037;
+    font-size: 13px;
+}
+
+/* Action Button */
+.ejoy-actions {
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+}
+
+.ejoy-add-btn {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(46, 204, 113, 0.3);
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.ejoy-add-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(46, 204, 113, 0.4);
+}
+
+.ejoy-add-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

@@ -1,0 +1,4 @@
+
+
+export const CURENT_TIME_STAMP = 'CURRENT_TIMESTAMP(6)';
+export const CURENT_USER_KEY = 'USER'
