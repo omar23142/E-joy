@@ -230,13 +230,8 @@ function initVideoOverlay() {
                             const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
                             const rect = span.getBoundingClientRect();
 
-                            // Position popup near the clicked word (works in fullscreen too)
-                            if (currentFullscreenElement) {
-                                // Use fixed positioning with word's viewport coordinates
-                                showPopup(rect.left, rect.bottom + 10, cleanWord, true);
-                            } else {
-                                showPopup(rect.left, rect.bottom + window.scrollY, cleanWord, false);
-                            }
+                            // Position popup below the word using viewport coordinates
+                            showPopup(rect.left, rect.bottom + 5, cleanWord);
                         });
 
                         originalEl.appendChild(span);
@@ -276,19 +271,22 @@ function showPopup(x, y, text, isFullscreen = false) {
     const popup = document.createElement('div');
     popup.className = 'ejoy-popup-card';
 
+    // Always use fixed positioning since we're using viewport coordinates (getBoundingClientRect)
+    popup.style.position = 'fixed';
+
     let leftPos = x;
+    // Keep popup within viewport bounds
     if (leftPos + 320 > window.innerWidth) leftPos = window.innerWidth - 340;
     if (leftPos < 0) leftPos = 10;
 
-    // Use fixed positioning in fullscreen
-    if (isFullscreen) {
-        popup.style.position = 'fixed';
-        popup.style.left = `${leftPos}px`;
-        popup.style.top = `${y}px`;
-    } else {
-        popup.style.left = `${leftPos}px`;
-        popup.style.top = `${y + 10}px`;
-    }
+    let topPos = y;
+    // Ensure popup doesn't go off bottom of screen
+    if (topPos + 400 > window.innerHeight) topPos = window.innerHeight - 420;
+    if (topPos < 0) topPos = 10;
+
+    popup.style.left = `${leftPos}px`;
+    popup.style.top = `${topPos}px`;
+    popup.style.zIndex = '2147483647'; // Ensure it's on top
 
     // Tabbed HTML Structure
     popup.innerHTML = `

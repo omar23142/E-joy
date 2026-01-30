@@ -17,9 +17,11 @@ import { VideosModule } from 'src/videos/videos.module';
     JwtModule,
     TypeOrmModule.forFeature([
       Vocabulary,
+      
     ])
   ],
   controllers: [VocabularyController],
   providers: [VocabularyService],
+  exports:[VocabularyService]
 })
 export class VocabularyModule { }

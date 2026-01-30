@@ -4,9 +4,9 @@ export class CreateVocabularyDto {
     @IsString()
     @IsNotEmpty()
     word: string;
-    // @IsString()
-    // @IsNotEmpty()
-    // translation: string;
+    @IsString()
+    @IsOptional()
+    translation?: string;
     @IsString()
     @IsNotEmpty()
     language: string;

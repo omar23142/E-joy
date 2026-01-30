@@ -9,11 +9,11 @@ export class Lists {
     id: number;
     @Column()
     name: string;
-    @Column()
+    @Column({ nullable: true })
     description: string;
 
     @OneToMany(() => Vocabulary, (vocabulary) => vocabulary.list)
-    vocabulary: Vocabulary[];
+    vocabulary?: Vocabulary[] | null;
     @ManyToOne(() => User, (user) => user.lists)
     user: User;
 }

@@ -35,8 +35,8 @@ export class VocabularyController {
 
   //@UseGuards(ProtectGard)
   @Get('/api/v1/vocabulary/:wordId')
-  findOne(@Param('wordId', ParseIntPipe) wordId: number) {
-    return this.vocabularyService.findOne(+wordId);
+  findOne(@Param('wordId', ParseIntPipe) wordId: number, @GetCurrentUser() user: User) {
+    return this.vocabularyService.findOne(+wordId, user.id);
   }
 
   @UseGuards(ProtectGard)

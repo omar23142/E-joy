@@ -27,6 +27,21 @@ export class VocabularyService {
     const translatedText = data.responseData.translatedText;
     const sentenceToHash = contextSentence || '';
     const contextSentenceHashed = createHash('md5').update(sentenceToHash).digest('hex');
+
+
+    //check if the word - translation -context already exist for this user
+    const existVocab = await this.vocRepo.findOne({
+      where: {
+        user: { id: user.id },
+        word: word,
+        translation: translatedText,
+        contextSentenceHashed: contextSentenceHashed
+      }
+    })
+    if (existVocab)
+      throw new ConflictException('vocabulary already exist with same translate and context sentence')
+
+
     const newVocab = this.vocRepo.create({
       word,
       contextSentence,
@@ -38,23 +53,12 @@ export class VocabularyService {
       list: listId ? { id: listId } : null,
       video: videoId ? { id: videoId } : null
     });
-
     //check if list and video exist before saving
     if (listId)
       await this.listService.IsListExist(listId)
     if (videoId)
       await this.videoService.IsVideoExist(videoId)
-    //check if the word - translation already exist for this user
-    const existVocab = await this.vocRepo.findOne({
-      where: {
-        user: { id: user.id },
-        word: word,
-        translation: translatedText,
-        contextSentenceHashed: contextSentenceHashed
-      }
-    })
-    if (existVocab)
-      throw new ConflictException('vocabulary already exist with same translate and context sentence')
+
     return await this.vocRepo.save(newVocab);
   }
 
@@ -65,16 +69,22 @@ export class VocabularyService {
   }
 
   async findAllForCurrentUser(userId: number) {
-    let vocab = await this.vocRepo.find({ where: { id: userId } });
+    let vocab = await this.vocRepo.find({
+      where: {
+        user: { id: userId }
+      }
+    });
 
     return vocab;
   }
 
-  async findOne(id: number) {
-    let vocab = await this.vocRepo.findOneBy({ id });
+  async findOne(WordId: number, UserId: number) {
+   let vocab = await this.vocRepo.findOne({ where: { id: WordId }, relations: { user: true } });
     if (!vocab) {
-      throw new NotFoundException('vocabulary with id ' + id + ' not found');
+      throw new NotFoundException('vocabulary with id ' + WordId + ' not found');
     }
+    if (vocab.user.id !== UserId)
+      throw new ForbiddenException("you can't update word that not belong to you")
     return vocab;
   }
 

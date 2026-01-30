@@ -4,7 +4,7 @@ import { User } from "src/users/entity/User.entity";
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity('Vocabulary')
-@Unique(['word', 'translation', 'user', 'contextSentenceHashed'])
+@Unique(['word', 'translation', 'user', 'contextSentenceHashed', 'list'])
 export class Vocabulary {
     @PrimaryGeneratedColumn()
     id: number;
