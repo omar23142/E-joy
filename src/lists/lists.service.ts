@@ -94,6 +94,17 @@ export class ListsService {
           return this.vocabRibo.save(existVocab)
         }
         else  {
+          const sameVocab = await this.vocabRibo.findOne({
+            where: {
+              user: { id: user.id },
+              word: existVocab.word ,
+              translation: existVocab.translation,
+              contextSentenceHashed: existVocab.contextSentenceHashed,
+              list:existList
+            }
+          })
+          if (sameVocab)
+            throw new ConflictException('this word has already exist on your list')
           const newVocab = this.vocabRibo.create({
           word: existVocab.word,
           translation: existVocab.translation,

@@ -1,0 +1,61 @@
+
+
+
+### all lists
+Get http://localhost:3000/api/v1/lists
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+### all lists for admin
+Get http://localhost:3000/api/v1/admin/lists
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+
+### single lists
+Get http://localhost:3000/api/v1/lists/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+### post
+Post http://localhost:3000/api/v1/lists
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+
+{
+    "name":"fuck LIST",
+    "description":"fuck words"
+}
+
+### post
+Post http://localhost:3000/api/v1/lists/2/vocabulary
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+
+{
+    "vocabId":3
+}
+
+
+### patch
+PATCH http://localhost:3000/api/v1/lists/4
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+{
+    "name":"fuck",
+    "description":"روح انتاك"
+}
+
+
+
+### DELETE
+DELETE  http://localhost:3000/api/v1/lists/4
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+

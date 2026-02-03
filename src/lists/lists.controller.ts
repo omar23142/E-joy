@@ -27,22 +27,33 @@ export class ListsController {
   return this.listsService.AddWordToList(dto, listId, user)
   }
 
+  @UseGuards(ProtectGard)
+  @Delete('/api/v1/lists/:listId/vocabulary/:vocabId')
+  RemoveWordFromList(
+    @Param('listid', ParseIntPipe) listId: number,
+    @Param('vocabId',ParseIntPipe) vocabId:number,
+    @GetCurrentUser() user: User) {
+    return this.listsService.RemoveWordFromList(listId, vocabId, user);
+  }
+
   @Get('/api/v1/lists')
   @UseGuards(ProtectGard)
   findAll(@GetCurrentUser() user: User) {
-    return this.listsService.findAllForCurrentUser(user);
-  }
-
-  @Get('/api/v1/admin/lists')
-  @Roles(userType.ADMIN)
-  @UseGuards(ProtectGard, RestrictToGuard)
-  findAllForAdmin(@GetCurrentUser() user: User) {
+    if(user.role === userType.NORMAL_USER || user.role === userType.SUBSCRIPED_USER)
+      return this.listsService.findAllForCurrentUser(user);
     return this.listsService.findAllForAdmin();
   }
+
+  // @Get('/api/v1/admin/lists')
+  // @Roles(userType.ADMIN)
+  // @UseGuards(ProtectGard, RestrictToGuard)
+  // findAllForAdmin(@GetCurrentUser() user: User) {
+  //   return this.listsService.findAllForAdmin();
+  // }
   @UseGuards(ProtectGard)
-  @Get('/api/v1/lists/:id')
-  findOne(@Param('id', ParseIntPipe) id: number, @GetCurrentUser() user: User) {
-    return this.listsService.findOne(+id, user);
+  @Get('/api/v1/lists/:listId')
+  findOne(@Param('listId', ParseIntPipe) listId: number, @GetCurrentUser() user: User) {
+    return this.listsService.findOne(+listId, user);
   }
   @UseGuards(ProtectGard)
   @Patch('/api/v1/lists/:id')

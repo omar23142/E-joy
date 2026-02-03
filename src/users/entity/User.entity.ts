@@ -3,7 +3,8 @@ import { CURENT_TIME_STAMP } from "../../utils/constants";
 import { userType } from "../../utils/enum";
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { Video } from "src/videos/entities/video.entity";
-import { Lists } from "src/lists/entities/list.entity";
+import { Lists } from "../../lists/entities/list.entity"
+
 import { Vocabulary } from "src/vocabulary/entities/vocabulary.entity";
 
 

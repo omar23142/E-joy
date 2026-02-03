@@ -1,51 +1,65 @@
 
 
-### all vocabulary
-Get http://localhost:3000/api/v1/vocabulary
+
+
+
+
+### all videos
+Get http://localhost:3000/api/v1/videos
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
 
 
-### all vocabulary for admin
-Get http://localhost:3000/api/v1/admin/vocabulary
+### all videos for admin
+Get http://localhost:3000/api/v1/admin/videos
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
 
 
 
-### single vocabulary
-Get http://localhost:3000/api/v1/vocabulary/1
+### single lists
+Get http://localhost:3000/api/v1/videos/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
 
 
 ### post
-Post http://localhost:3000/api/v1/vocabulary/addword
+Post http://localhost:3000/api/v1/videos
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 
 
 {
-    "word":"fuck you",
-    "language":"en",
-    "contextSentence":"fuck you",
-    "timeStamp":18,
-    "videoId":2
-    
+    "title":"fuck",
+    "originalUrl":"https://youtu.be/_heWmBEjvi8",
+    "platform":"youtube"
 }
 
+### post
+Post http://localhost:3000/api/v1/videos/2/vocabulary
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+
+{
+    "vocabId":3
+}
+
+
 ### patch
-PATCH http://localhost:3000/api/v1/vocabulary/4
+PATCH http://localhost:3000/api/v1/videos/4
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 
 {
-    "word":"fuck you",
-    "translation":"روح انتاك"
+    "name":"fuck",
+    "description":"روح انتاك"
 }
 
 
 
 ### DELETE
-DELETE  http://localhost:3000/api/v1/vocabulary/1
+DELETE  http://localhost:3000/api/v1/videos/4
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 
