@@ -4,46 +4,100 @@ import { UpdateVideoDto } from './dto/update-video.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Video } from './entities/video.entity';
 import {  Repository } from 'typeorm';
-import { platform } from 'os';
 import { Vocabulary } from 'src/vocabulary/entities/vocabulary.entity';
 import { User } from 'src/users/entity/User.entity';
+import { createHash } from 'crypto';
+
 
 @Injectable()
 export class VideosService {
   constructor(
     @InjectRepository(Video)
     private readonly videoRepo: Repository<Video>,
+    @InjectRepository(Vocabulary)
+    private readonly vocabRepo: Repository<Vocabulary>
   ) { }
-  async create(dto: CreateVideoDto) {
-    const {originalUrl, platform, title} = dto;
-    let platformId:string = this.extractPlatformId(originalUrl, platform);
-    let existVideo;
-    if (platformId === originalUrl) {
-      existVideo = await this.videoRepo.findOne( {
-      where:{
-        originalUrl:originalUrl
-    }
-  });
-  platformId = ''
-  } else { 
-    console.log(platformId)
-    existVideo = await this.videoRepo.findOne( {
-      where:{
-        platform:platform,
-        platformId:platformId }
+
+  async getOrCreateVideo(originalUrl:string, platform:string, title:string) {
+      //  let result :string | urlObject =  this.extractPlatformId(originalUrl, platform);
+      //  let video;
+      //  if ( typeof result !== 'string' && result.isUrlHashed )
+      //  {
+      //    video = await this.videoRepo.findOneBy( { platformId: result.urlhashed , platform: platform})
+      //  } else if(typeof result === 'string' ) {
+      //  video = await this.videoRepo.findOneBy({ platformId: result}) 
+      // }
+
+      // if(!video) {
+      //   const dto = new CreateVideoDto(originalUrl, platform, title)
+      //     return this.create(dto)
+      // }
+      // return video;
+
+       let platformId :string  =  this.extractPlatformId(originalUrl, platform);
+        const video = await this.videoRepo.findOneBy({ platformId, platform }) 
+
+      if(video) 
+        return video;
+       const dto = new CreateVideoDto(originalUrl, platform, title)
+       // try for dealing with race condtion
+      try {
+       let newVideo = this.videoRepo.create(
+      {
+      originalUrl:dto.originalUrl,
+      title:dto.title,
+      platform:dto.platform,
+      platformId:platformId,
       });
-    }
-    if (existVideo)
-      throw new BadRequestException('this video with this url and  platform is already exist ');
-    console.log(platformId)
-    let newVideo = await  this.videoRepo.create({
-      originalUrl:dto.originalUrl
-      ,title:dto.title,
-      platform:dto.platform
-      ,platformId:platformId});
-    console.log(newVideo);
+      console.log(newVideo);
     return this.videoRepo.save(newVideo);
-  }
+    }catch (err:unknown) {
+      if(err instanceof Error && (err.message.includes('unique') || (err as any).code === '23505'))
+        return await this.videoRepo.findOneBy({platform, platformId});
+      throw err;
+    }
+       
+
+  
+}
+  // async create(dto: CreateVideoDto) {
+  //   const {originalUrl, platform, title} = dto;
+  //   let platformId: urlObject | string = this.extractPlatformId(originalUrl, platform);
+  //   console.log(platformId)
+  //   if(typeof platformId !== 'string')
+  //     platformId = platformId.urlhashed
+  //   let existVideo;
+  //   if (platformId === originalUrl) {
+  //     console.log(platformId, originalUrl)
+  //     existVideo = await this.videoRepo.findOne( {
+  //     where:{
+  //       originalUrl:originalUrl
+  //   }
+  // });
+  // console.log(existVideo)
+  // // platformId = ''
+  // } else { 
+  //   console.log('in else ',platformId)
+  //   existVideo = await this.videoRepo.findOne( {
+  //     where:{
+  //       platform:platform,
+  //       platformId:platformId }
+  //     });
+  //     console.log('in else ',existVideo)
+  //   }
+  //   if (existVideo)
+  //     throw new BadRequestException('this video with this url and  platform is already exist ');
+  //   console.log(platformId)
+  //   let newVideo = await  this.videoRepo.create(
+  //     {
+  //     originalUrl:dto.originalUrl,
+  //     title:dto.title,
+  //     platform:dto.platform,
+  //     platformId:platformId,
+  //     });
+  //   console.log(newVideo);
+  //   return this.videoRepo.save(newVideo);
+  // }
 
   public async findAllForCurrentUser(userId:number) {
 //    SELECT DISTINCT v.*
@@ -81,7 +135,6 @@ export class VideosService {
     if (!video)
       throw new NotFoundException('this video with this id: '+videoId + ' and for this user not exist')
     return video;
-    
   }
 
   async update(videoId: number, dto: UpdateVideoDto, user:User) {
@@ -95,8 +148,20 @@ export class VideosService {
     return this.videoRepo.save(updatedVideo);
   }
 
-  async remove(videoId:number, user:User) {
-    const video = await this.findOne(videoId, user);
+
+  // for remove vocab from spicific video
+  async unlinkVideoFromVocab(userId:number, videoId:number){
+    return await this.vocabRepo.update({user:{id:userId}, video:{id:videoId}}, 
+      {video : null}
+    )
+
+  }
+
+ 
+  async removeForAdmin(videoId:number) {
+    const video = await this.videoRepo.findOneBy({id:videoId});
+    if (!video)
+      throw new BadRequestException('this video is not exist be sure from the id ');
     return this.videoRepo.remove(video);
   }
 
@@ -112,67 +177,55 @@ export class VideosService {
     return video;
   }
 
-  private extractPlatformId(originalUrl:string, platform:string): string {
-    switch (platform.toLocaleLowerCase()) {
-      case 'youtube':
-        const ytRegex = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-        //const ytRegex2 = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-        const match1 =  originalUrl.match(ytRegex);
-        console.log('match1', match1);
-        //const match2 = originalUrl.match(ytRegex2);
-        //console.log('match2', match2);
-        return match1 ? match1[1] : originalUrl;
+ 
+    private extractPlatformId(originalUrl: string, platform: string) {
+  // 1. دالة مساعدة بسيطة: تعطيها النمط (Regex) وتعطيك الـ ID أو null
+  const findId = (regex: RegExp) => {
+    const match = originalUrl.match(regex);
+    return match ? match[1] : null;
+  };
 
-      case 'vimeo':
-        const vimoRegex  =   /(?:vimeo\.com\/|player\.vimeo\.com\/video\/)([0-9]+)/;
-        const match = originalUrl.match(vimoRegex);
-        console.log(match);
-        return match ? match[1] : originalUrl;
+  // 2. التحقق بناءً على المنصة
+  switch (platform.toLowerCase()) {
+    
+    case 'youtube':
+      // يدعم: watch, embed, shorts, youtu.be
+      return findId(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/) 
+             || originalUrl;
 
-      case 'coursera':
-          const courseraRegex = /coursera\.org\/learn\/[^\/]+\/lecture\/([^\/?#]+)/
-          const courseraMatch = originalUrl.match(courseraRegex);
-          console.log(courseraMatch)
-          return courseraMatch? courseraMatch[1] : originalUrl;
+    case 'vimeo':
+      return findId(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)([0-9]+)/) 
+             || originalUrl;
 
-      case 'udemy':
-        const udemyRegex = /udemy\.com\/course\/[^\/]+\/learn\/lecture\/(\d+)/;
-        const udemyMatch = originalUrl.match(udemyRegex);
-        console.log(udemyMatch);
-        return udemyMatch ? udemyMatch[1] : originalUrl;
+    case 'coursera':
+      return findId(/coursera\.org\/learn\/[^\/]+\/lecture\/([^\/?#]+)/) 
+             || originalUrl;
 
-      case 'facebook':
-        const fbRegex1 = /facebook\.com\/.+\/videos\/(\d+)/;      // /{user}/videos/{id}
-        const fbRegex2 = /facebook\.com\/video\.php\?v=(\d+)/;   // video.php?v=ID
-        const faceMatch1 = originalUrl.match(fbRegex1);
-        const faceMatch2 = originalUrl.match(fbRegex2);
-        console.log(faceMatch1, faceMatch2);
-        return faceMatch1 ? faceMatch1[1] : faceMatch2 ? faceMatch2[1] : originalUrl;
+    case 'udemy':
+      return findId(/udemy\.com\/course\/[^\/]+\/learn\/lecture\/(\d+)/) 
+             || originalUrl;
 
-      case 'instagram':
-        const instagramRegex =/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/;
-        const instaMatch = originalUrl.match(instagramRegex);
-        console.log(instaMatch);
-        return instaMatch ? instaMatch[1] : originalUrl;
+    case 'facebook':
+      // نجرب الرابط العادي أولاً، إذا لم ينجح نجرب رابط video.php
+      return findId(/facebook\.com\/.+\/videos\/(\d+)/) 
+             || findId(/facebook\.com\/video\.php\?v=(\d+)/) 
+             || originalUrl;
 
-      case 'tiktok': 
-      const tiktokRegex =/tiktok\.com\/@[^\/]+\/video\/(\d+)/;
-      const tiktokMatch = originalUrl.match(tiktokRegex);
-      console.log(tiktokMatch);
+    case 'instagram':
+      // يدعم: posts (p), reels, tv
+      return findId(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/) 
+             || originalUrl;
 
-      const tiktokshort = /vm\.tiktok\.com\/([A-Za-z0-9]+)/;
-      const shortMatch = originalUrl.match(tiktokshort)
-      console.log(shortMatch)
+    case 'tiktok':
+      // نجرب الرابط الطويل أولاً، ثم الرابط القصير (vm.tiktok)
+      return findId(/tiktok\.com\/@[^\/]+\/video\/(\d+)/) 
+             || findId(/vm\.tiktok\.com\/([A-Za-z0-9]+)/) 
+             || originalUrl;
 
-      return shortMatch ? shortMatch[1] : tiktokMatch? tiktokMatch[1] : originalUrl;
-
-      default:
-        return originalUrl;
-  
-  
-
-      
-
-    }
+    default:
+      let urlhashed =  createHash('md5').update(originalUrl).digest('hex') ;
+      return urlhashed;
   }
+}
+  
 }

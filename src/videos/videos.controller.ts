@@ -6,14 +6,16 @@ import { GetCurrentUser } from 'src/users/decorators/current-user.decorator';
 import { ProtectGard } from 'src/users/guards/Protect.guard';
 import { User } from 'src/users/entity/User.entity';
 import { userType } from 'src/utils/enum';
+import { RestrictToGuard } from 'src/users/guards/RestrictTo.guard';
+import { Roles } from 'src/users/decorators/userRole.decorator';
 
 @Controller('/api/v1/videos')
 export class VideosController {
   constructor(private readonly videosService: VideosService) {}
 
   @Post()
-  create(@Body() createVideoDto: CreateVideoDto) {
-    return this.videosService.create(createVideoDto);
+  create(@Body() dto: CreateVideoDto) {
+    return this.videosService.getOrCreateVideo(dto.originalUrl, dto.platform, dto.title);
   }
 
   @UseGuards(ProtectGard)
@@ -36,9 +38,12 @@ export class VideosController {
     return this.videosService.update(+videoId, updateVideoDto, user);
   }
 
-  @UseGuards(ProtectGard)
+  @Roles(userType.ADMIN)
+  @UseGuards(ProtectGard, RestrictToGuard)
   @Delete(':videoId')
-  remove(@Param('videoId',ParseIntPipe) videoId: number, @GetCurrentUser() user:User) {
-    return this.videosService.remove(videoId, user);
+  remove(@Param('videoId',ParseIntPipe) videoId: number,@GetCurrentUser() user:User) {
+    if(user.role === userType.ADMIN)
+      return this.videosService.removeForAdmin(videoId);
+    return this.videosService.unlinkVideoFromVocab(user.id, videoId)
   }
 }

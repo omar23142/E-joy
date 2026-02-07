@@ -17,6 +17,7 @@ export class Video {
     platform: string;
     @Column({ nullable:true })
     platformId:string;
+   
 
     // @ManyToOne(() => User, (user) => user.videos, { onDelete: 'CASCADE' })
     // user: User

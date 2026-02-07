@@ -11,14 +11,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 
 
 ### all videos for admin
-Get http://localhost:3000/api/v1/admin/videos
+Get http://localhost:3000/api/v1/videos
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
 
 
 
 ### single lists
-Get http://localhost:3000/api/v1/videos/1
+Get http://localhost:3000/api/v1/videos/2
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
 
@@ -30,9 +30,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 
 
 {
-    "title":"fuck",
-    "originalUrl":"https://youtu.be/_heWmBEjvi8",
-    "platform":"youtube"
+    "title":"udemy sql course",
+    "originalUrl":"https://sudemyw/t7Su-IeX7QA",
+    "platform":"udemy"
 }
 
 ### post
@@ -47,13 +47,14 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 
 
 ### patch
-PATCH http://localhost:3000/api/v1/videos/4
+PATCH http://localhost:3000/api/v1/videos/2
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 
 {
-    "name":"fuck",
-    "description":"روح انتاك"
+    "title":"fuck",
+   //"originalUrl":"newurl",
+   "platform":"youtube"
 }
 
 

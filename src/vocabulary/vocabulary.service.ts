@@ -18,11 +18,11 @@ export class VocabularyService {
     private readonly vocRepo: Repository<Vocabulary>,
     private readonly listService: ListsService,
     private readonly videoService: VideosService) { }
+
   async create(dto: CreateVocabularyDto, user: User) {
-    const { word, contextSentence, timeStamp, language, listId, videoId } = dto;
+    const { word, contextSentence, timeStamp, language, listId, videoDetailes:CreateVideoDto } = dto;
 
     const res = await fetch(`https://api.mymemory.translated.net/get?q=${word}&langpair=en|ar`);
-
     const data = await res.json();
     const translatedText = data.responseData.translatedText;
     const sentenceToHash = contextSentence || '';
@@ -38,6 +38,7 @@ export class VocabularyService {
         contextSentenceHashed: contextSentenceHashed
       }
     })
+
     if (existVocab)
       throw new ConflictException('vocabulary already exist with same translate and context sentence')
 
@@ -61,10 +62,8 @@ export class VocabularyService {
 
     return await this.vocRepo.save(newVocab);
   }
-
   async findAllForAdmin() {
     let vocab = await this.vocRepo.find();
-
     return vocab;
   }
 
@@ -136,5 +135,10 @@ export class VocabularyService {
     if (vocab.user.id !== UserId)
       throw new ForbiddenException('you are not allowed to delete word not belong to you')
     return this.vocRepo.remove(vocab);
+  }
+
+   // for remove all the vocab from spicific video
+  async removeVideoActivity(videoId:number, userId:number) {
+    return await this.vocRepo.delete({user:{id:userId}, video:{id:videoId}})
   }
 }

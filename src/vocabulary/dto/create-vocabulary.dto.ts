@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
+import { CreateVideoDto } from "src/videos/dto/create-video.dto";
 
 export class CreateVocabularyDto {
     @IsString()
@@ -22,8 +23,7 @@ export class CreateVocabularyDto {
     @IsNotEmpty()
     @IsOptional()
     listId?: number;
-    @IsNumber()
-    @IsNotEmpty()
+    
     @IsOptional()
-    videoId?: number;
+    videoDetailes?: CreateVideoDto;
 }

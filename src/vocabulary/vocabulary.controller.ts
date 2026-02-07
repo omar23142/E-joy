@@ -52,4 +52,11 @@ export class VocabularyController {
   remove(@Param('wordId', ParseIntPipe) wordId: number, @GetCurrentUser() user: User) {
     return this.vocabularyService.remove(+wordId, user.id);
   }
+
+  
+  @UseGuards(ProtectGard)
+  @Delete('/api/v1/vocabulary/video/:videoId')
+  deleteAllVocabForSpicificVideo(@Param('videoId', ParseIntPipe) videoId: number, @GetCurrentUser() user: User) {
+    return this.vocabularyService.removeVideoActivity(videoId, user.id);
+  }
 }
