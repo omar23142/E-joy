@@ -15,6 +15,8 @@ import { VideosModule } from './videos/videos.module';
 import { UsersModule } from './users/users.module';
 import { JwtModule, JwtModuleAsyncOptions } from '@nestjs/jwt';
 import { Authconfig } from './config/AuthClass';
+import { DictionaryModule } from './dictionary/dictionary.module';
+import { Dictionary } from './dictionary/entities/dictionary.entity';
 
 //console.log('from app.module', process.env.NODE_ENV)
 @Module({
@@ -25,7 +27,7 @@ import { Authconfig } from './config/AuthClass';
     JwtModule.registerAsync({
       inject: [Authconfig],
       useFactory: (config: Authconfig): JwtModuleAsyncOptions => {
-        console.log('this is test', config.jwt_secret_key)
+        //console.log('this is test', config.jwt_secret_key)
         return {
           global: true,
           secret: config.jwt_secret_key,
@@ -52,12 +54,13 @@ import { Authconfig } from './config/AuthClass';
             host: 'localhost',
             synchronize: process.env.NODE_ENV !== 'production',
             //dropSchema: true,
-            entities: [User, Video, Lists, Vocabulary],
+            entities: [User, Video, Lists, Vocabulary, Dictionary],
             port: config.DB_port
           } as TypeOrmModuleAsyncOptions
         }
       }
-    )
+    ),
+    DictionaryModule
   ],
   controllers: [AppController],
   providers: [AppService],

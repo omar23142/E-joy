@@ -8,12 +8,14 @@ import { UserService } from '../users/User.Service';
 import { UsersModule } from 'src/users/users.module';
 import { ListsModule } from 'src/lists/lists.module';
 import { VideosModule } from 'src/videos/videos.module';
+import { DictionaryModule } from 'src/dictionary/dictionary.module';
 
 @Module({
   imports: [
     ListsModule,
     VideosModule,
     UsersModule,
+    DictionaryModule,
     JwtModule,
     TypeOrmModule.forFeature([
       Vocabulary,

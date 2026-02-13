@@ -15,7 +15,7 @@ export class VideosController {
 
   @Post()
   create(@Body() dto: CreateVideoDto) {
-    return this.videosService.getOrCreateVideo(dto.originalUrl, dto.platform, dto.title);
+    return this.videosService.getOrCreateVideo(dto);
   }
 
   @UseGuards(ProtectGard)

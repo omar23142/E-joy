@@ -7,7 +7,7 @@ export class AppService {
   constructor(private readonly config: Authconfig) { }
   getHello(): string {
     console.log(process.env.NODE_ENV)
-    console.log(this.config.jwt_secret_key)
+    //console.log(this.config.jwt_secret_key)
     // const res = await fetch("https://libretranslate.com/translate", {
     //   method: "POST",
     //   body: JSON.stringify({

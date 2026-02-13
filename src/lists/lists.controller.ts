@@ -17,7 +17,7 @@ export class ListsController {
   @UseGuards(ProtectGard)
   @Post('/api/v1/lists')
   create(@Body() createListDto: CreateListDto, @GetCurrentUser() user: User) {
-    return this.listsService.create(createListDto, user);
+    return this.listsService.getOrCreate(createListDto, user);
   }
 
   

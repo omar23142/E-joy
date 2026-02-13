@@ -18,7 +18,7 @@ export class VideosService {
     private readonly vocabRepo: Repository<Vocabulary>
   ) { }
 
-  async getOrCreateVideo(originalUrl:string, platform:string, title:string) {
+  async getOrCreateVideo(dto:CreateVideoDto) {
       //  let result :string | urlObject =  this.extractPlatformId(originalUrl, platform);
       //  let video;
       //  if ( typeof result !== 'string' && result.isUrlHashed )
@@ -33,13 +33,13 @@ export class VideosService {
       //     return this.create(dto)
       // }
       // return video;
-
+      const { originalUrl, platform, title } = dto;
        let platformId :string  =  this.extractPlatformId(originalUrl, platform);
         const video = await this.videoRepo.findOneBy({ platformId, platform }) 
 
       if(video) 
         return video;
-       const dto = new CreateVideoDto(originalUrl, platform, title)
+       
        // try for dealing with race condtion
       try {
        let newVideo = this.videoRepo.create(

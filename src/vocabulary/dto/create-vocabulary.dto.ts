@@ -1,5 +1,27 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
-import { CreateVideoDto } from "src/videos/dto/create-video.dto";
+import { Type } from "class-transformer";
+import { IsNotEmpty, IsNumber, IsOptional, IsString, registerDecorator, ValidateNested, ValidationArguments, ValidationOptions } from "class-validator";
+import { CreateListDto } from "src/lists/dto/create-list.dto";
+
+
+export class CreatelistDto {
+    @IsNotEmpty()
+    @IsString()
+    listName:string;
+    @IsOptional()
+    @IsString()
+    description?:string;
+}
+export class CreateVideoDto {
+    @IsString()
+    @IsNotEmpty()
+    originalUrl:string;
+    @IsNotEmpty()
+    @IsString()
+    platform:string;
+    @IsNotEmpty()
+    @IsString()
+    title:string;
+}
 
 export class CreateVocabularyDto {
     @IsString()
@@ -19,11 +41,19 @@ export class CreateVocabularyDto {
     @IsNotEmpty()
     @IsOptional()
     timeStamp?: number;
+
+    @IsOptional()
     @IsNumber()
     @IsNotEmpty()
-    @IsOptional()
     listId?: number;
-    
+
     @IsOptional()
+    @ValidateNested()
+    @Type(()=> CreateVideoDto)
     videoDetailes?: CreateVideoDto;
+
+    @IsOptional()
+    @ValidateNested()
+    @Type(()=>CreateListDto)
+    listDetailes?: CreateListDto;
 }

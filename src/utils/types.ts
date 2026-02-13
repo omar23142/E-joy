@@ -12,3 +12,8 @@ export type videoDetailes = {
     platform:string;
      title:string;
     }
+
+    export type listDetailes = {
+        name:string;
+        description:string;
+    }

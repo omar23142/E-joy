@@ -19,7 +19,7 @@ export class ListsService {
     @Inject(forwardRef(() => VocabularyService))
     private readonly vocabService: VocabularyService,
   ) { }
-  async create(dto: CreateListDto, user: User) {
+  async getOrCreate(dto: CreateListDto, user: User) {
     const { name, description } = dto;
 
     // check if this list already exist for thsi user
@@ -30,7 +30,7 @@ export class ListsService {
       }
     })
     if (existList)
-      throw new ConflictException(`this list with this name: ${name} is already exist for this user`)
+      return existList;
 
     let newList = this.listRepo.create({
       name: name,
@@ -39,6 +39,7 @@ export class ListsService {
     });
     return this.listRepo.save(newList);
   }
+
 
 
   async findAllForCurrentUser(user: User) {
@@ -132,11 +133,10 @@ export class ListsService {
     const existVocab:Vocabulary | null =  await this.vocabService.findOne(vocabId, user.id);
     if (!existVocab)
       throw new BadRequestException('there is no word with this id to remove it from list')
-     if (existList && existVocab) {
+    if (existList && existVocab) {
       existVocab.list = null;
     }
     return this.vocabRibo.save(existVocab);
-    
   }
 
   public async IsListExist(ListId: number) {
