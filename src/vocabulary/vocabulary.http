@@ -21,19 +21,20 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 
 
 ### post
-Post http://localhost:3000/api/v1/vocabulary/addword
+Post http://localhost:3000/api/v1/vocabulary
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 
 
 {
-    "word":"sing",
+    "word":"grand",
     "language":"en",
-    "contextSentence":"dad is sing",
+    "contextSentence":"",
+    "selectedTranslate":"هبة",
     "timeStamp":18,
     "listId":2,
      "videoDetailes":{
-         "originalUrl":"https://youtu.be/V725mUnxI-w",
+         "originalUrl":"https://youtu.be/T64lj4XLWZ4",
          "platform":"youtube",
         "title":"sing video"
     }

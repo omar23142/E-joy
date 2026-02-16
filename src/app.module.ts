@@ -17,6 +17,7 @@ import { JwtModule, JwtModuleAsyncOptions } from '@nestjs/jwt';
 import { Authconfig } from './config/AuthClass';
 import { DictionaryModule } from './dictionary/dictionary.module';
 import { Dictionary } from './dictionary/entities/dictionary.entity';
+import { TranslateModule } from './translate/translate.module';
 
 //console.log('from app.module', process.env.NODE_ENV)
 @Module({
@@ -60,7 +61,8 @@ import { Dictionary } from './dictionary/entities/dictionary.entity';
         }
       }
     ),
-    DictionaryModule
+    DictionaryModule,
+    TranslateModule
   ],
   controllers: [AppController],
   providers: [AppService],

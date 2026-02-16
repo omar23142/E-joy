@@ -9,6 +9,7 @@ import { UsersModule } from 'src/users/users.module';
 import { ListsModule } from 'src/lists/lists.module';
 import { VideosModule } from 'src/videos/videos.module';
 import { DictionaryModule } from 'src/dictionary/dictionary.module';
+import { TranslateModule } from 'src/translate/translate.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DictionaryModule } from 'src/dictionary/dictionary.module';
     VideosModule,
     UsersModule,
     DictionaryModule,
+    TranslateModule,
     JwtModule,
     TypeOrmModule.forFeature([
       Vocabulary,

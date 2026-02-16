@@ -28,13 +28,12 @@ export class CreateVocabularyDto {
     @IsNotEmpty()
     word: string;
     @IsString()
-    @IsOptional()
-    translation?: string;
+    @IsNotEmpty()
+    selectedTranslate: string;
     @IsString()
     @IsNotEmpty()
     language: string;
     @IsString()
-    @IsNotEmpty()
     @IsOptional()
     contextSentence?: string;
     @IsNumber()

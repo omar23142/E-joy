@@ -14,7 +14,7 @@ export class VocabularyController {
   constructor(private readonly vocabularyService: VocabularyService) { }
 
   @UseGuards(ProtectGard)
-  @Post('/api/v1/vocabulary/addword')
+  @Post('/api/v1/vocabulary')
   create(@Body() createVocabularyDto: CreateVocabularyDto, @GetCurrentUser() user: User) {
     return this.vocabularyService.create(createVocabularyDto, user);
   }
