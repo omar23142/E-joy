@@ -23,6 +23,8 @@
                 "content.css"
             ],
             "js": [
+                "config.js",
+                "api-service.js",
                 "content.js"
             ],
             "all_frames": true

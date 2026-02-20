@@ -36,8 +36,8 @@ Post http://localhost:3000/api/v1/users/auth/signup
 Content-Type: application/json
 
 {
-     "userName":"omar",
-    "email":"omar@mail.com",
+     "userName":"omarrrrr",
+    "email":"omarrrr@mail.com",
     "password":"123456788",
     "passwordConf":"123456788",
     "photo":"omaralmPhoto.jpg",

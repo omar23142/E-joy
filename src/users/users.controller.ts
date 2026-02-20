@@ -65,7 +65,8 @@ export class UsersController {
     @Post('/api/v1/users/auth/signin')
     @Throttle({ default: { limit: 3, ttl: 10000 } })
     @HttpCode(HttpStatus.OK)
-    public async signin(@Body() body: LoginDto, req: ExpressRequest) {
+    public async signin(@Body() body: LoginDto, @Req() req: ExpressRequest) {
+        console.log('in the signin controller', req.protocol);
         const result = await this.UserService.login(body, req);
         console.log('Result in Controller:', result);
         return result;

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Joy Login</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      width: 350px;
+      min-height: 400px;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .auth-container {
+      padding: 20px;
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      transition: all 0.3s;
+    }
+
+    .auth-tab.active {
+      color: #3498db;
+      border-bottom-color: #3498db;
+    }
+
+    .auth-view {
+      display: none;
+    }
+
+    .auth-view.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      font-size: 12px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .success-message {
+      color: #27ae60;
+      font-size: 12px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #3498db;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+      display: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .auth-header h2 {
+      margin: 0;
+      color: #2c3e50;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-header">
+      <h2>🎓 E-Joy Login</h2>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login">Login</button>
+      <button class="auth-tab" id="tab-signup">Sign Up</button>
+    </div>
+
+    <!-- Login View -->
+    <div class="auth-view active" id="login-view">
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" required placeholder="Enter your email">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required placeholder="Enter your password">
+        </div>
+        <button type="submit" class="submit-btn" id="login-btn">
+          <span class="btn-text">Login</span>
+          <div class="loader" id="login-loader"></div>
+        </button>
+        <div class="error-message" id="login-error"></div>
+      </form>
+    </div>
+
+    <!-- Signup View -->
+    <div class="auth-view" id="signup-view">
+      <form id="signup-form">
+        <div class="form-group">
+          <label for="signup-username">Username</label>
+          <input type="text" id="signup-username" required placeholder="Choose a username">
+        </div>
+        <div class="form-group">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" required placeholder="Enter your email">
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" required placeholder="Create a password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="signup-password-conf">Confirm Password</label>
+          <input type="password" id="signup-password-conf" required placeholder="Confirm your password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="native-language">Native Language</label>
+          <select id="native-language" required>
+            <option value="ar">Arabic (العربية)</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="target-language">Target Language</label>
+          <select id="target-language" required>
+            <option value="en">English</option>
+            <option value="ar">Arabic (العربية)</option>
+          </select>
+        </div>
+        <button type="submit" class="submit-btn" id="signup-btn">
+          <span class="btn-text">Sign Up</span>
+          <div class="loader" id="signup-loader"></div>
+        </button>
+        <div class="error-message" id="signup-error"></div>
+        <div class="success-message" id="signup-success"></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="api-service.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>

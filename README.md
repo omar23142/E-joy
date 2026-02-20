@@ -1,98 +1,53 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# EJOY Clone Project
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This project is a Chrome extension integrated with a NestJS backend, designed for language learners (specifically English to Arabic) to translate and save vocabulary while watching videos.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Project Architecture
 
-## Description
+### 1. Chrome Extension (Frontend)
+Located in the `extension/` directory.
+- **`manifest.json`**: Configuration file for the extension.
+- **`content.js`**: Main content script injected into video pages (YouTube, etc.). Handles video interaction, dual subtitle overlay, and the interactive word-click popup.
+- **`content.css`**: Styles for the subtitle box, word spans, and the interactive popup card.
+- **`api-service.js`**: A centralized service for communication with the NestJS backend.
+- **`config.js`**: Environment configuration (API base URL, storage keys).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+#### Key Features:
+- **Dual Subtitles**: Integrated overlay for video players.
+- **Interactive Popup**: Word definition, multi-translation selection, and advanced data (Synonyms, Examples, Definitions) fetched from the `Free Dictionary API`.
+- **Integrated Auth**: Login and Signup forms directly within the popup.
+- **Unified Save Button**: A split-button with a dropdown for choosing save destinations (List + Video, List Only, Video Only).
 
-## Project setup
+### 2. NestJS Backend (Backend)
+Located in the `src/` directory.
+- **`src/translate/`**: Handles word translation using a combination of local database matches and external APIs (MyMemory).
+- **`src/vocabulary/`**: Manages user vocabulary entries, including audio, examples, and video associations.
+- **`src/lists/`**: Manages user-created vocabulary lists.
+- **`src/users/`**: Handles authentication, user profiles, and JWT-based security.
+- **`src/dictionary/`**: Provides access to a specialized dictionary database.
 
-```bash
-$ npm install
-```
+#### Core Logic:
+- **Context-Aware Translation**: Uses MD5 hashing of context sentences to provide specific translations for words based on their usage.
+- **Automatic List/Video Registration**: Automatically creates or links lists and videos during the vocabulary creation process if they don't already exist.
 
-## Compile and run the project
+## Tech Stack
+- **Frontend**: Vanilla JavaScript, CSS3, HTML5 (Chrome Extension).
+- **Backend**: NestJS (TypeScript), TypeORM, PostgreSQL.
+- **External APIs**: MyMemory (Translation), Free Dictionary API (Definitions/Synonyms).
 
-```bash
-# development
-$ npm run start
+## How to Run
 
-# watch mode
-$ npm run start:dev
+### Backend
+1. Ensure PostgreSQL is running.
+2. Run `npm install`.
+3. Start the dev server: `npm run start:dev`.
 
-# production mode
-$ npm run start:prod
-```
+### Extension
+1. Open Chrome and go to `chrome://extensions/`.
+2. Enable "Developer mode".
+3. Click "Load unpacked" and select the `extension/` folder.
+4. Ensure the `API_BASE_URL` in `extension/config.js` points to your running backend.
 
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Advanced Vocabulary Logic
+- **Context Hashing**: The property `contextSentenceHashed` is used to match words in specific sentences.
+- **Split Pointers**: Vocabulary entries can point to both a `List` and a `Video`, or just one of them, depending on the user's choosing in the extension.

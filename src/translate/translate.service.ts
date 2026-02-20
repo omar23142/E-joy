@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { CreateTranslateDto } from './dto/create-translate.dto';
 import { UpdateTranslateDto } from './dto/update-translate.dto';
 import { VocabularyService } from 'src/vocabulary/vocabulary.service';
@@ -53,10 +54,14 @@ export class TranslateService {
   //   return translatedText;
   //   }
 
-  public async translate(word: string, contextSentenceHashed: string,) {
+  public async translate(word: string, contextSentence: string = '') {
     let APItranslate: string[];
     let sugestionTranslate: string[] = [];
+
+    // Hash the context sentence to match database records
+    const contextSentenceHashed = createHash('md5').update(contextSentence || '').digest('hex');
     console.log('contextSentenceHashed', contextSentenceHashed)
+
     let contextTranPromise = this.translateWithContext(word, contextSentenceHashed);
     let freqTranslatePromise = this.translateWithOutContext(word);
     let dictionaryTranslatePromise = this.dictionaryService.findByWord(word);

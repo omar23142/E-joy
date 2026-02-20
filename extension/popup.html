@@ -1,56 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>E-Joy Translator</title>
+  <meta charset="UTF-8">
+  <title>E-Joy Translate</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      text-align: center;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .info-box {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid #eee;
+    }
+
+    h2 {
+      color: #e67e22;
+      margin-top: 0;
+    }
+
+    p {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  </style>
 </head>
+
 <body>
-
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-translate">Translate</button>
-    <button class="tab-btn" id="tab-list">My List</button>
+  <div class="info-box">
+    <h2>eJOY Ready!</h2>
+    <p>The extension is active. Just hover over or click any word in the video subtitles to translate and save.</p>
+    <p style="font-size: 12px; color: #999;">Login/Logout is now integrated directly in the video popup.</p>
   </div>
-
-  <div class="container">
-    
-    <!-- Translate View -->
-    <div id="translate-view">
-      <div class="card">
-        <textarea id="input-text" placeholder="Enter text to translate..."></textarea>
-      </div>
-      
-      <button id="translate-btn" class="btn">
-        <span class="btn-text">Translate</span>
-        <div class="loader" id="loader"></div>
-      </button>
-
-      <div class="card result-area" id="result-area">
-        <div class="result-label">English</div>
-        <div class="word-original" id="display-original" style="margin-bottom: 8px;"></div>
-        
-        <div class="result-label">Arabic</div>
-        <div class="result-text" id="display-translated"></div>
-        
-        <button id="add-btn" class="btn btn-secondary">
-          + Add to List
-        </button>
-      </div>
-    </div>
-
-    <!-- List View -->
-    <div id="list-view" class="card">
-      <div id="words-container">
-        <!-- Words will be injected here -->
-      </div>
-      <div id="empty-state" class="empty-state" style="display: none;">
-        No words saved yet.
-      </div>
-    </div>
-
-  </div>
-
-  <script src="popup.js"></script>
 </body>
+
 </html>

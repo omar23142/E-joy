@@ -39,6 +39,63 @@
     opacity: 0.9;
 }
 
+.ejoy-subtitle-box.ejoy-minimized {
+    background: rgba(0, 0, 0, 0.2);
+    /* Faint background when minimized */
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 25px 0 0 0;
+    /* Space for buttons */
+}
+
+.ejoy-subtitle-box.ejoy-minimized .ejoy-subtitle-controls {
+    opacity: 0.7;
+    right: 0;
+    top: 0;
+}
+
+.ejoy-subtitle-box.ejoy-minimized .ejoy-subtitle-controls:hover {
+    opacity: 1;
+}
+
+/* Subtitle Toggle Controls */
+.ejoy-subtitle-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 6px;
+    z-index: 10;
+}
+
+.ejoy-toggle-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    pointer-events: auto;
+}
+
+.ejoy-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.ejoy-toggle-btn.active {
+    background: #ffd700;
+    color: #000;
+    border-color: #ffd700;
+    box-shadow: 0 2px 6px rgba(255, 215, 0, 0.4);
+}
+
 .ejoy-subtitle-original {
     font-size: 1.6em;
     font-weight: 700;
@@ -108,8 +165,10 @@
 
 /* Popup Card - Modern & Tabbed */
 .ejoy-popup-card {
-    position: absolute;
-    width: 320px;
+    position: fixed;
+    /* Keep it fixed relative to viewport for dragging simplicity */
+    width: 340px;
+    max-height: 90vh;
     background: #ffffff;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
@@ -117,7 +176,10 @@
     font-family: 'Segoe UI', 'Roboto', sans-serif;
     color: #333;
     animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
+    /* Clips the flex children (header/content/actions) */
     border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
@@ -133,6 +195,14 @@
     }
 }
 
+.ejoy-popup-card.dragging {
+    cursor: grabbing !important;
+}
+
+.ejoy-popup-card.dragging * {
+    cursor: grabbing !important;
+}
+
 /* Header */
 .ejoy-popup-header {
     background: #f8f9fa;
@@ -141,6 +211,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: move;
+    user-select: none;
+    /* Prevent text selection during drag */
 }
 
 .ejoy-word-title {
@@ -177,8 +250,9 @@
 
 .ejoy-tab-btn {
     flex: 1;
-    padding: 12px 5px;
-    font-size: 13px;
+    padding: 10px 2px;
+    font-size: 11px;
+    /* Slightly smaller to fit more tabs */
     font-weight: 600;
     color: #7f8c8d;
     background: none;
@@ -202,7 +276,27 @@
 /* Tab Content */
 .ejoy-tab-content {
     padding: 16px;
-    min-height: 120px;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #fff;
+}
+
+/* Custom Scrollbar for better UI */
+.ejoy-tab-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ejoy-tab-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.ejoy-tab-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+}
+
+.ejoy-tab-content::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }
 
 .ejoy-tab-pane {
@@ -227,12 +321,36 @@
     margin-bottom: 4px;
 }
 
+.ejoy-translation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .ejoy-main-translation {
-    font-size: 24px;
-    color: #e67e22;
-    font-weight: bold;
+    font-size: 18px;
+    color: #34495e;
+    font-weight: normal;
     direction: rtl;
     line-height: 1.2;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 6px;
+    margin-bottom: 4px;
+}
+
+.ejoy-main-translation:hover {
+    background: #fdf2e9;
+    color: #e67e22;
+}
+
+.ejoy-main-translation.selected {
+    background: #fdf2e9;
+    color: #e67e22;
+    font-weight: bold;
+    border: 1px solid #e67e22;
 }
 
 .ejoy-text-content {
@@ -251,34 +369,103 @@
     font-size: 13px;
 }
 
-/* Action Button */
-.ejoy-actions {
-    padding: 12px 16px;
-    background: #f8f9fa;
-    border-top: 1px solid #eee;
+/* Unified Split Button */
+.ejoy-split-btn-container {
+    display: flex;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(46, 204, 113, 0.3);
+    border-radius: 6px;
+    overflow: visible;
+    /* To allow dropdown to show */
 }
 
-.ejoy-add-btn {
-    width: 100%;
+.ejoy-add-btn-main {
+    flex: 1;
     padding: 10px;
     background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(46, 204, 113, 0.3);
     transition: all 0.2s;
     font-size: 14px;
 }
 
-.ejoy-add-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(46, 204, 113, 0.4);
+.ejoy-add-btn-arrow {
+    width: 40px;
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    color: white;
+    border: none;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
 }
 
-.ejoy-add-btn:active {
-    transform: translateY(0);
+.ejoy-add-btn-main:hover,
+.ejoy-add-btn-arrow:hover {
+    filter: brightness(1.05);
+}
+
+/* Dropdown Menu */
+.ejoy-dropdown-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    width: 200px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    display: none;
+    flex-direction: column;
+    padding: 8px 0;
+    margin-bottom: 8px;
+    z-index: 1000;
+    animation: slideUp 0.2s ease;
+}
+
+.ejoy-dropdown-menu.active {
+    display: flex;
+}
+
+.ejoy-dropdown-item {
+    padding: 10px 15px;
+    font-size: 13px;
+    color: #34495e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.2s;
+}
+
+.ejoy-dropdown-item:hover {
+    background: #f8f9fa;
+    color: #e67e22;
+}
+
+.ejoy-dropdown-item input {
+    cursor: pointer;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 @keyframes fadeIn {
@@ -289,4 +476,115 @@
     to {
         opacity: 1;
     }
+}
+
+/* Auth Styles inside Popup */
+.ejoy-auth-container {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ejoy-auth-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+.ejoy-auth-input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.ejoy-auth-input:focus {
+    border-color: #3498db;
+}
+
+.ejoy-auth-btn {
+    padding: 10px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.ejoy-auth-btn:hover {
+    background: #2980b9;
+}
+
+.ejoy-auth-switch {
+    font-size: 12px;
+    color: #7f8c8d;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+.ejoy-auth-switch:hover {
+    color: #3498db;
+    text-decoration: underline;
+}
+
+.ejoy-auth-error {
+    color: #e74c3c;
+    font-size: 12px;
+    text-align: center;
+    margin-top: -5px;
+    display: none;
+}
+
+/* Save Options Toggle */
+.ejoy-save-options {
+    display: flex;
+    background: #eee;
+    padding: 3px;
+    border-radius: 8px;
+    margin-bottom: 5px;
+}
+
+.ejoy-option-btn {
+    flex: 1;
+    padding: 6px 2px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 6px;
+    color: #7f8c8d;
+    transition: all 0.2s;
+}
+
+.ejoy-option-btn.active {
+    background: white;
+    color: #2c3e50;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* User Profile in Header */
+.ejoy-user-info {
+    font-size: 11px;
+    color: #95a5a6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ejoy-logout-link {
+    color: #e74c3c;
+    cursor: pointer;
+}
+
+.ejoy-logout-link:hover {
+    text-decoration: underline;
 }

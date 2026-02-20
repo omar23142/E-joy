@@ -146,6 +146,13 @@ export class AuthProvider {
         return { accessToken: jwtToken };
     }
     private generateVerifyUrl(user: User, token: string, req: ExpressRequest) {
+        //console.log('req', req)
+
+        //const protocol = req?.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+        //console.log(protocol)
+        //console.log('in the generateVerifyUrl', req.protocol, req.get('host'))
+
+
         return `${req.protocol}://${req.get('host')}/api/v1/users/verify-email/${user.id}/${token}`
     }
 }
