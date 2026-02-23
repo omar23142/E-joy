@@ -116,6 +116,50 @@ export class TranslateService {
     return sugestionTranslate;
   }
 
+  // Batch translate an array of sentences (for subtitle files)
+  public async batchTranslate(sentences: string[]): Promise<{ original: string; translation: string }[]> {
+    const CHUNK_SIZE = 45; // Increased to reduce number of hits
+    const results: { original: string; translation: string }[] = [];
+
+    // Process in chunks
+    for (let i = 0; i < sentences.length; i += CHUNK_SIZE) {
+      const chunk = sentences.slice(i, i + CHUNK_SIZE);
+      try {
+        // Google Translate unofficial API - best quality for subtitles
+        const joined = chunk.join('\n');
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(joined)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Google: ${res.status}`);
+        const data = await res.json();
+
+        // Response is: [[["translated_chunk", "original_chunk", ...], ...], ...]
+        // Rejoin and split by newline to map back to original sentences
+        const translatedJoined = data[0].map((item: any[]) => item[0]).join('');
+        const translatedLines = translatedJoined.split('\n');
+
+        chunk.forEach((original, idx) => {
+          results.push({ original, translation: translatedLines[idx]?.trim() || original });
+        });
+      } catch (googleErr) {
+        console.warn('Google batch failed, falling back to MyMemory per-sentence:', googleErr.message);
+        // Fallback: translate sentence by sentence with MyMemory
+        for (const sentence of chunk) {
+          try {
+            const res = await fetch(
+              `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sentence)}&langpair=en|ar`
+            );
+            const data = await res.json();
+            results.push({ original: sentence, translation: data.responseData?.translatedText || sentence });
+          } catch {
+            results.push({ original: sentence, translation: sentence });
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
   public async translateWithContext(word: string, contextSentenceHashed: string) {
     console.log('in the withContext')
     return await this.vocabRepo.createQueryBuilder("vocab")

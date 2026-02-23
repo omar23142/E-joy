@@ -11,10 +11,16 @@ import { ProtectGard } from 'src/users/guards/Protect.guard';
 import { GetCurrentUser } from 'src/users/decorators/current-user.decorator';
 import { User } from 'src/users/entity/User.entity';
 import { TranslateService } from './translate.service';
+import { IsArray, IsString } from 'class-validator';
+
+class BatchTranslateDto {
+  @IsArray()
+  sentences: string[];
+}
 
 @Controller()
 export class TranslateController {
-  constructor(private readonly translateService: TranslateService) {}
+  constructor(private readonly translateService: TranslateService) { }
   @UseGuards(ProtectGard)
   @HttpCode(HttpStatus.OK)
   @Post('/api/v1/translate')
@@ -26,6 +32,13 @@ export class TranslateController {
       translateDto.word,
       translateDto.contextSentence,
     );
+  }
+
+  // Batch subtitle translation — no auth needed, translates array of sentences
+  @HttpCode(HttpStatus.OK)
+  @Post('/api/v1/translate/batch')
+  async batchTranslate(@Body() dto: BatchTranslateDto) {
+    return this.translateService.batchTranslate(dto.sentences);
   }
 
   //   @Roles(userType.ADMIN)

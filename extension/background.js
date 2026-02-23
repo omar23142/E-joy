@@ -155,9 +155,86 @@ function onRequestFinished(details) {
     }
 }
 
-// Listen for completed requests
+// Listen for completed requests (network intercept)
 chrome.webRequest.onCompleted.addListener(
     onRequestFinished,
     { urls: ['<all_urls>'] },
     []
 );
+
+// Listen for direct fetch requests from content script (Coursera DOM scraping)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'EJOY_FETCH_SUBTITLE') {
+        const { url, isArabic } = message;
+        if (!url) return;
+
+        const videoId = extractVideoId(url) || extractVideoId(sender.tab?.url || '') || 'coursera';
+        const key = makeDedupeKey(url);
+
+        if (recentUrlKeys.has(key)) {
+            console.log(`[EJOY] Skipping duplicate Coursera fetch: ${key}`);
+            return;
+        }
+        recentUrlKeys.add(key);
+        setTimeout(() => recentUrlKeys.delete(key), 10000);
+
+        console.log(`[EJOY] Fetching Coursera ${isArabic ? 'ARABIC' : 'ENGLISH'} VTT:`, url);
+
+        fetch(url)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+            .then(text => {
+                if (!text || text.trim().length < 10) return;
+                const payload = { url, videoId, text, time: Date.now(), isArabicProbe: isArabic };
+                console.log(`[EJOY] ✅ Coursera ${isArabic ? 'ARABIC' : 'ENGLISH'} VTT sent. Size: ${text.length} chars`);
+                if (sender.tab && sender.tab.id) {
+                    chrome.tabs.sendMessage(sender.tab.id, { type: 'EJOY_SUBTITLE_FOUND', payload });
+                }
+            })
+            .catch(err => console.warn(`[EJOY] Coursera fetch failed: ${err.message}`));
+    }
+
+    // NEW: Handle batch translation requests from content script
+    if (message.type === 'EJOY_BATCH_TRANSLATE') {
+        const { sentences } = message;
+        handleBatchTranslation(sentences).then(results => {
+            sendResponse({ success: true, translated: results });
+        }).catch(err => {
+            sendResponse({ success: false, error: err.message });
+        });
+        return true; // Keep channel open for async response
+    }
+});
+
+async function handleBatchTranslation(sentences) {
+    const CHUNK_SIZE = 40;
+    const results = [];
+
+    for (let i = 0; i < sentences.length; i += CHUNK_SIZE) {
+        const chunk = sentences.slice(i, i + CHUNK_SIZE);
+        try {
+            const joined = chunk.join('\n');
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(joined)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Google: ${res.status}`);
+            const data = await res.json();
+            const translatedJoined = data[0].map(item => item[0]).join('');
+            const translatedLines = translatedJoined.split('\n');
+
+            chunk.forEach((original, idx) => {
+                results.push({ original, translation: translatedLines[idx]?.trim() || original });
+            });
+        } catch (err) {
+            console.warn('[EJOY] Background Google Translate failed, falling back to MyMemory:', err.message);
+            for (const sentence of chunk) {
+                try {
+                    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(sentence)}&langpair=en|ar`);
+                    const data = await res.json();
+                    results.push({ original: sentence, translation: data.responseData?.translatedText || sentence });
+                } catch {
+                    results.push({ original: sentence, translation: sentence });
+                }
+            }
+        }
+    }
+    return results;
+}

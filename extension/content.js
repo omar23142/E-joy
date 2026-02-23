@@ -403,16 +403,24 @@ function initVideoOverlay() {
         const suppressionInterval = setInterval(suppressHostSubs, 1000);
         suppressHostSubs();
 
-        // Keep timeupdate as a fallback or for seeking
+        // Keep timeupdate as a fallback for seeking
         video.addEventListener('timeupdate', () => {
             if (!isSubtitlesLoaded || currentSubtitles.length === 0) {
                 parseTextTracks(video);
             }
-            // If the loop isn't running (e.g. paused), force an update once
-            if (video.paused) {
-                updateSubtitles();
-            }
+            if (video.paused) updateSubtitles();
         });
+
+        // === Coursera: Eager textTracks activation ===
+        // Try immediately, and also after a short delay for late-loading tracks
+        parseTextTracks(video);
+        setTimeout(() => parseTextTracks(video), 1500);
+        setTimeout(() => parseTextTracks(video), 4000);
+
+        // === Coursera / Generic: DOM Scraping for VTT URLs ===
+        if (window.location.href.includes('coursera.org')) {
+            setTimeout(() => scrapeCoursera(), 2000);
+        }
     });
 }
 
@@ -861,6 +869,67 @@ function showBubble(x, y, text) {
     });
 }
 
+// === Batch Subtitle Translation ===
+// Called after English subtitles are loaded, to auto-generate Arabic via backend
+async function batchTranslateSubtitles(cues) {
+    if (!cues || cues.length === 0) return;
+
+    const cacheKey = `ejoy_ar_cache_${window.location.href}`;
+
+    // 1. Check localStorage cache first (instant load on revisit!)
+    try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            const arCues = JSON.parse(cached);
+            if (arCues && arCues.length > 0) {
+                currentArabicSubtitles = arCues;
+                console.log(`[E-Joy] ✅ Arabic loaded from cache (${arCues.length} cues)`);
+                if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+                return;
+            }
+        }
+    } catch (e) { /* ignore cache errors */ }
+
+    // 2. Deduplicate sentences
+    const uniqueSentences = [...new Set(cues.map(c => c.text.trim()).filter(t => t.length > 0))];
+    console.log(`[E-Joy] Requesting background translation for ${uniqueSentences.length} sentences...`);
+
+    // 3. Send to background.js instead of local backend
+    chrome.runtime.sendMessage({ type: 'EJOY_BATCH_TRANSLATE', sentences: uniqueSentences }, (response) => {
+        if (!response || !response.success) {
+            console.warn('[E-Joy] Background translation failed:', response?.error || 'No response');
+            return;
+        }
+
+        const translated = response.translated; // [{original, translation}]
+
+        // 4. Build lookup map: original → arabic
+        const translationMap = {};
+        translated.forEach(item => {
+            if (item.original && item.translation) {
+                translationMap[item.original.trim()] = item.translation.trim();
+            }
+        });
+
+        // 5. Build Arabic cues array
+        const arCues = cues.map(cue => ({
+            start: cue.start,
+            end: cue.end,
+            text: translationMap[cue.text.trim()] || cue.text
+        })).filter(c => c.text);
+
+        currentArabicSubtitles = arCues;
+        console.log(`%c[E-Joy] ✅ Arabic Translation Done (via Background)`, 'color: #00ff88; font-weight: bold;');
+
+        // 6. Cache in localStorage
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(arCues));
+        } catch (e) { }
+
+        if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+    });
+}
+
 function parseTextTracks(videoElement) {
     if (!videoElement || !videoElement.textTracks || videoElement.textTracks.length === 0) return;
     let enTrack = null;
@@ -874,8 +943,9 @@ function parseTextTracks(videoElement) {
         }
     }
     if (enTrack) {
+        // Force-enable English track so cues are populated
         if (enTrack.mode === 'disabled') enTrack.mode = 'hidden';
-        setTimeout(() => {
+        const tryLoad = () => {
             if (enTrack.cues && enTrack.cues.length > 0 && !isSubtitlesLoaded) {
                 const extractedSubs = [];
                 for (let i = 0; i < enTrack.cues.length; i++) {
@@ -883,32 +953,104 @@ function parseTextTracks(videoElement) {
                     extractedSubs.push({
                         start: cue.startTime,
                         end: cue.endTime,
-                        text: cue.text,
-                        translation: "جارٍ جلب الترجمة..."
+                        text: cue.text.replace(/<[^>]+>/g, '').trim(),
+                        translation: '---'
                     });
-                }
-                if (arTrack) {
-                    if (arTrack.mode === 'disabled') arTrack.mode = 'hidden';
-                    setTimeout(() => {
-                        if (arTrack.cues && arTrack.cues.length > 0) {
-                            extractedSubs.forEach(sub => {
-                                const match = Array.from(arTrack.cues).find(ac =>
-                                    (ac.startTime >= sub.start && ac.startTime <= sub.end) ||
-                                    (ac.endTime >= sub.start && ac.endTime <= sub.end) ||
-                                    (sub.start >= ac.startTime && sub.start <= ac.endTime)
-                                );
-                                if (match) sub.translation = match.text;
-                                else sub.translation = "---";
-                            });
-                        }
-                    }, 100);
                 }
                 currentSubtitles = extractedSubs;
                 isSubtitlesLoaded = true;
-                console.log("[E-Joy] Step 1: Subtitles loaded from video.textTracks (Faster)");
+                console.log('[E-Joy] Step 1: English loaded from textTracks (' + extractedSubs.length + ' cues)');
+                if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+
+                if (arTrack) {
+                    // Try to load Arabic from textTracks (e.g. Coursera with Arabic track)
+                    if (arTrack.mode === 'disabled') arTrack.mode = 'hidden';
+                    setTimeout(() => {
+                        if (arTrack.cues && arTrack.cues.length > 0) {
+                            const arCues = [];
+                            for (let j = 0; j < arTrack.cues.length; j++) {
+                                const c = arTrack.cues[j];
+                                arCues.push({ start: c.startTime, end: c.endTime, text: c.text.replace(/<[^>]+>/g, '').trim() });
+                            }
+                            currentArabicSubtitles = arCues;
+                            console.log('[E-Joy] Arabic loaded from textTracks (' + arCues.length + ' cues)');
+                            if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+                        } else {
+                            // No Arabic track available → batch translate via backend
+                            batchTranslateSubtitles(extractedSubs);
+                        }
+                    }, 300);
+                } else {
+                    // No Arabic track at all → batch translate via backend
+                    batchTranslateSubtitles(extractedSubs);
+                }
+            } else if (!isSubtitlesLoaded) {
+                setTimeout(tryLoad, 500);
             }
-        }, 100);
+        };
+        setTimeout(tryLoad, 150);
     }
+}
+
+// === Coursera DOM Scraper ===
+function scrapeCoursera() {
+    console.log('[E-Joy] Scraping Coursera for subtitle URLs...');
+
+    // Strategy 1: Search window object for initial state data
+    const stateKeys = ['__NEXT_DATA__', '__INITIAL_STATE__', '__APOLLO_STATE__', 'CourseraApp'];
+    for (const key of stateKeys) {
+        if (window[key]) {
+            const json = JSON.stringify(window[key]);
+            extractVttUrlsFromJson(json);
+        }
+    }
+
+    // Strategy 2: Search all <script> tags for subtitle JSON
+    document.querySelectorAll('script').forEach(script => {
+        const text = script.textContent || '';
+        if (text.includes('.vtt') || text.includes('subtitle') || text.includes('caption')) {
+            extractVttUrlsFromJson(text);
+        }
+    });
+
+    // Strategy 3: Search <a> and <track> elements for .vtt hrefs
+    document.querySelectorAll('track[kind="subtitles"], track[kind="captions"]').forEach(track => {
+        const src = track.src;
+        const lang = track.srclang || track.getAttribute('srclang') || '';
+        const label = track.label || '';
+        if (src && src.includes('.vtt')) {
+            const isAr = lang.startsWith('ar') || label.toLowerCase().includes('arabic');
+            console.log(`[E-Joy Coursera] Found <track>: ${label} (${lang}) → fetching as ${isAr ? 'Arabic' : 'English'}`);
+            chrome.runtime.sendMessage({ type: 'EJOY_FETCH_SUBTITLE', url: src, isArabic: isAr });
+        }
+    });
+}
+
+function extractVttUrlsFromJson(text) {
+    // Match .vtt URLs in JSON/script text
+    const vttRegex = /https?:\/\/[^"'\s]+\.vtt[^"'\s]*/g;
+    const matches = text.match(vttRegex);
+    if (!matches) return;
+
+    const seen = new Set();
+    matches.forEach(url => {
+        if (seen.has(url)) return;
+        seen.add(url);
+        const lower = url.toLowerCase();
+        // Determine language from the URL path or query
+        const isAr = lower.includes('/ar') || lower.includes('_ar') || lower.includes('lang=ar') ||
+            lower.includes('arabic') || lower.includes('-ar.');
+        const isEn = lower.includes('/en') || lower.includes('_en') || lower.includes('lang=en') ||
+            lower.includes('english') || lower.includes('-en.');
+        if (isAr) {
+            console.log('[E-Joy Coursera] Found Arabic VTT:', url);
+            chrome.runtime.sendMessage({ type: 'EJOY_FETCH_SUBTITLE', url, isArabic: true });
+        } else if (isEn || !isAr) {
+            // If can't determine, try as English
+            console.log('[E-Joy Coursera] Found English VTT:', url);
+            chrome.runtime.sendMessage({ type: 'EJOY_FETCH_SUBTITLE', url, isArabic: false });
+        }
+    });
 }
 
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
@@ -965,6 +1107,10 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
                     console.log(`[E-Joy] English Subtitles Loaded (${parsedNewCues.length} cues)`);
                     currentSubtitles = parsedNewCues;
                     isSubtitlesLoaded = true;
+                    // If no Arabic subtitles yet, auto-translate via backend
+                    if (currentArabicSubtitles.length === 0) {
+                        batchTranslateSubtitles(parsedNewCues);
+                    }
                 }
                 console.log("[E-Joy] Step 2: Independent Sync UI Ready.");
                 // Trigger update even if video is paused
