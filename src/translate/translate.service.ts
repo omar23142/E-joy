@@ -144,7 +144,7 @@ export class TranslateService {
     const data = await res.json();
     const translatedText = data.responseData.translatedText;
     console.log('split2', translatedText)
-    let probletTranslate: string[] = []
+    let probletTranslate: string[] = [];
     let i: number = 0;
     for (i; i < data.matches.length; i++) {
       // console.log('data', data.matches[i].translation)

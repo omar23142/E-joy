@@ -13,7 +13,9 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true })) //whitlist delete any field not exist on dto , forbidNonWhitelisted throw error if any field not exist on dto throw an error 
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  ); //whitlist delete any field not exist on dto , forbidNonWhitelisted throw error if any field not exist on dto throw an error
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

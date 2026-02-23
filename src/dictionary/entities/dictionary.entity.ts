@@ -1,5 +1,3 @@
-
-
 import { Entity, PrimaryGeneratedColumn, Column, Index } from 'typeorm';
 
 @Entity({ name: 'dictionary' })
@@ -7,7 +5,6 @@ import { Entity, PrimaryGeneratedColumn, Column, Index } from 'typeorm';
 @Index('idx_eng', ['eng'])
 @Index('idx_ara', ['ara'])
 export class Dictionary {
-
   @PrimaryGeneratedColumn()
   id: number;
 

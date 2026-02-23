@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { VideosService } from './videos.service';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UpdateVideoDto } from './dto/update-video.dto';
@@ -20,30 +30,39 @@ export class VideosController {
 
   @UseGuards(ProtectGard)
   @Get()
-  findAllForCurrentUser(@GetCurrentUser() user:User) {
-     if(user.role === userType.ADMIN)
-       return this.videosService.findAll();
+  findAllForCurrentUser(@GetCurrentUser() user: User) {
+    if (user.role === userType.ADMIN) return this.videosService.findAll();
     return this.videosService.findAllForCurrentUser(user.id);
   }
 
   @UseGuards(ProtectGard)
   @Get('/:videoId')
-  findOne(@Param('videoId',ParseIntPipe) videoId: number, @GetCurrentUser() user:User) {
+  findOne(
+    @Param('videoId', ParseIntPipe) videoId: number,
+    @GetCurrentUser() user: User,
+  ) {
     return this.videosService.findOne(videoId, user);
   }
 
   @UseGuards(ProtectGard)
   @Patch(':videoId')
-  update(@Param('videoId',ParseIntPipe) videoId: number, @Body() updateVideoDto: UpdateVideoDto,@GetCurrentUser() user:User) {
+  update(
+    @Param('videoId', ParseIntPipe) videoId: number,
+    @Body() updateVideoDto: UpdateVideoDto,
+    @GetCurrentUser() user: User,
+  ) {
     return this.videosService.update(+videoId, updateVideoDto, user);
   }
 
   @Roles(userType.ADMIN)
   @UseGuards(ProtectGard, RestrictToGuard)
   @Delete(':videoId')
-  remove(@Param('videoId',ParseIntPipe) videoId: number,@GetCurrentUser() user:User) {
-    if(user.role === userType.ADMIN)
+  remove(
+    @Param('videoId', ParseIntPipe) videoId: number,
+    @GetCurrentUser() user: User,
+  ) {
+    if (user.role === userType.ADMIN)
       return this.videosService.removeForAdmin(videoId);
-    return this.videosService.unlinkVideoFromVocab(user.id, videoId)
+    return this.videosService.unlinkVideoFromVocab(user.id, videoId);
   }
 }

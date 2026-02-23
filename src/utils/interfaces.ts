@@ -1,9 +1,5 @@
-
-
-
 export interface CustomRequest extends Request {
-    user: {
-        id: number;
-
-    };
+  user: {
+    id: number;
+  };
 }

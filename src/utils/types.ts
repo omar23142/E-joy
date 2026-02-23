@@ -1,19 +1,15 @@
-
-
-
 export type JwtPayloadType = {
-    id:number;
-    role:string;
-}
-
+  id: number;
+  role: string;
+};
 
 export type videoDetailes = {
-    originalUrl:string;
-    platform:string;
-     title:string;
-    }
+  originalUrl: string;
+  platform: string;
+  title: string;
+};
 
-    export type listDetailes = {
-        name:string;
-        description:string;
-    }
+export type listDetailes = {
+  name: string;
+  description: string;
+};

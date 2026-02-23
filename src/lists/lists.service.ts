@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,7 +25,7 @@ export class ListsService {
     private readonly vocabRibo: Repository<Vocabulary>,
     @Inject(forwardRef(() => VocabularyService))
     private readonly vocabService: VocabularyService,
-  ) { }
+  ) {}
   async getOrCreate(dto: CreateListDto, user: User) {
     const { name, description } = dto;
 
@@ -26,55 +33,50 @@ export class ListsService {
     const existList = await this.listRepo.findOne({
       where: {
         name: name,
-        user: { id: user.id }
-      }
-    })
-    if (existList)
-      return existList;
+        user: { id: user.id },
+      },
+    });
+    if (existList) return existList;
 
-    let newList = this.listRepo.create({
+    const newList = this.listRepo.create({
       name: name,
       description: description,
-      user: user
+      user: user,
     });
     return this.listRepo.save(newList);
   }
 
-
-
   async findAllForCurrentUser(user: User) {
-    let lists = await this.listRepo.find({
-      where:
-      {
-        user: { id: user.id }
-      }
-    })
+    const lists = await this.listRepo.find({
+      where: {
+        user: { id: user.id },
+      },
+    });
     return lists;
   }
 
   async findAllForAdmin() {
-    let lists = await this.listRepo.find()
-    console.log('in findforadmin')
+    const lists = await this.listRepo.find();
+    console.log('in findforadmin');
     return lists;
   }
 
   async findOne(listId: number, user: User) {
-    let list = await this.listRepo.findOne({
-      where:
-      {
+    const list = await this.listRepo.findOne({
+      where: {
         user: { id: user.id },
-        id: listId
-      }
-    })
+        id: listId,
+      },
+    });
     if (!list)
-      throw new NotFoundException('there is no list with this id :' + listId)
+      throw new NotFoundException('there is no list with this id :' + listId);
     return list;
   }
 
   async update(listId: number, dto: UpdateListDto, user: User) {
-    let list = await this.findOne(listId, user)
+    const list = await this.findOne(listId, user);
     const { name, description } = dto;
-    let updated_list = list;
+    const updated_list = list;
     updated_list.name = dto.name ?? list.name;
     updated_list.description = dto.description ?? list.description;
     await this.listRepo.save(updated_list);
@@ -82,31 +84,39 @@ export class ListsService {
   }
 
   async remove(listId: number, user: User) {
-    let list = await this.findOne(listId, user);
-    return await this.listRepo.remove(list);;
+    const list = await this.findOne(listId, user);
+    return await this.listRepo.remove(list);
   }
 
-  public async AddWordToList(dto:AddWordToListDto,listId:number, user:User) {
-    const existList:Lists | null = await this.findOne(listId, user);
-    const existVocab:Vocabulary | null =  await this.vocabService.findOne(dto.vocabId, user.id);
-    if (existList && existVocab ) {
-        if(existVocab.list === null) {
-          existVocab.list = existList;
-          return this.vocabRibo.save(existVocab)
-        }
-        else  {
-          const sameVocab = await this.vocabRibo.findOne({
-            where: {
-              user: { id: user.id },
-              word: existVocab.word ,
-              translation: existVocab.translation,
-              contextSentenceHashed: existVocab.contextSentenceHashed,
-              list:existList
-            }
-          })
-          if (sameVocab)
-            throw new ConflictException('this word has already exist on your list')
-          const newVocab = this.vocabRibo.create({
+  public async AddWordToList(
+    dto: AddWordToListDto,
+    listId: number,
+    user: User,
+  ) {
+    const existList: Lists | null = await this.findOne(listId, user);
+    const existVocab: Vocabulary | null = await this.vocabService.findOne(
+      dto.vocabId,
+      user.id,
+    );
+    if (existList && existVocab) {
+      if (existVocab.list === null) {
+        existVocab.list = existList;
+        return this.vocabRibo.save(existVocab);
+      } else {
+        const sameVocab = await this.vocabRibo.findOne({
+          where: {
+            user: { id: user.id },
+            word: existVocab.word,
+            translation: existVocab.translation,
+            contextSentenceHashed: existVocab.contextSentenceHashed,
+            list: existList,
+          },
+        });
+        if (sameVocab)
+          throw new ConflictException(
+            'this word has already exist on your list',
+          );
+        const newVocab = this.vocabRibo.create({
           word: existVocab.word,
           translation: existVocab.translation,
           contextSentence: existVocab.contextSentence,
@@ -117,22 +127,26 @@ export class ListsService {
           list: existList,
           video: existVocab.video,
         });
-          console.log('yyyyyyyy', newVocab)
-           return this.vocabRibo.save(newVocab);
-        }
-          
+        console.log('yyyyyyyy', newVocab);
+        return this.vocabRibo.save(newVocab);
+      }
     }
-   
-    
   }
 
-  public async RemoveWordFromList(listId:number, vocabId:number, user:User) {
-    const existList:Lists | null = await this.findOne(listId, user);
+  public async RemoveWordFromList(listId: number, vocabId: number, user: User) {
+    const existList: Lists | null = await this.findOne(listId, user);
     if (!existList)
-      throw new BadRequestException('there is no list with this id to remove word from it ')
-    const existVocab:Vocabulary | null =  await this.vocabService.findOne(vocabId, user.id);
+      throw new BadRequestException(
+        'there is no list with this id to remove word from it ',
+      );
+    const existVocab: Vocabulary | null = await this.vocabService.findOne(
+      vocabId,
+      user.id,
+    );
     if (!existVocab)
-      throw new BadRequestException('there is no word with this id to remove it from list')
+      throw new BadRequestException(
+        'there is no word with this id to remove it from list',
+      );
     if (existList && existVocab) {
       existVocab.list = null;
     }
@@ -140,13 +154,11 @@ export class ListsService {
   }
 
   public async IsListExist(ListId: number) {
-    const list = await this.listRepo.findOne(
-      {
-        where: { id: ListId },
-        select: ['id']
-      });
-    if (!list)
-      throw new NotFoundException('this list is no longer exist')
+    const list = await this.listRepo.findOne({
+      where: { id: ListId },
+      select: ['id'],
+    });
+    if (!list) throw new NotFoundException('this list is no longer exist');
     return list;
   }
 }

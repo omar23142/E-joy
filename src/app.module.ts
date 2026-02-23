@@ -21,9 +21,16 @@ import { TranslateModule } from './translate/translate.module';
 
 //console.log('from app.module', process.env.NODE_ENV)
 @Module({
-  imports: [VocabularyModule, ListsModule, VideosModule, UsersModule,
+  imports: [
+    VocabularyModule,
+    ListsModule,
+    VideosModule,
+    UsersModule,
     ConfigifyModule.forRootAsync({
-      configFilePath: process.env.NODE_ENV !== 'production' ? join(__dirname, '../.env.development/.env') : '.env',
+      configFilePath:
+        process.env.NODE_ENV !== 'production'
+          ? join(__dirname, '../.env.development/.env')
+          : '.env',
     }),
     JwtModule.registerAsync({
       inject: [Authconfig],
@@ -32,41 +39,37 @@ import { TranslateModule } from './translate/translate.module';
         return {
           global: true,
           secret: config.jwt_secret_key,
-          signOptions: { expiresIn: config.jwt_secret_key }
-        } as JwtModuleAsyncOptions
-      }
+          signOptions: { expiresIn: config.jwt_secret_key },
+        } as JwtModuleAsyncOptions;
+      },
     }),
-    // local Data Base 
-    TypeOrmModule.forRootAsync(
-      {
-        inject: [DatabaseConfig],
-        useFactory: (config: DatabaseConfig) => {
-          const dbUsername = config.DB_username;
-          const dbpass = config.DB_password;
-          const database = config.DB_database;
-          const type = config.DB_type;
-          const port = config.DB_port;
-          //console.log(typeof port);
-          return {
-            database: database,
-            type: type,
-            username: dbUsername,
-            password: dbpass,
-            host: 'localhost',
-            synchronize: process.env.NODE_ENV !== 'production',
-            //dropSchema: true,
-            entities: [User, Video, Lists, Vocabulary, Dictionary],
-            port: config.DB_port
-          } as TypeOrmModuleAsyncOptions
-        }
-      }
-    ),
+    // local Data Base
+    TypeOrmModule.forRootAsync({
+      inject: [DatabaseConfig],
+      useFactory: (config: DatabaseConfig) => {
+        const dbUsername = config.DB_username;
+        const dbpass = config.DB_password;
+        const database = config.DB_database;
+        const type = config.DB_type;
+        const port = config.DB_port;
+        //console.log(typeof port);
+        return {
+          database: database,
+          type: type,
+          username: dbUsername,
+          password: dbpass,
+          host: 'localhost',
+          synchronize: process.env.NODE_ENV !== 'production',
+          //dropSchema: true,
+          entities: [User, Video, Lists, Vocabulary, Dictionary],
+          port: config.DB_port,
+        } as TypeOrmModuleAsyncOptions;
+      },
+    }),
     DictionaryModule,
-    TranslateModule
+    TranslateModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {
-
-}
+export class AppModule {}

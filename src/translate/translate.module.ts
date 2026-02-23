@@ -13,10 +13,10 @@ import { UsersModule } from 'src/users/users.module';
     DictionaryModule,
     JwtModule,
     UsersModule,
-    TypeOrmModule.forFeature([Vocabulary])
+    TypeOrmModule.forFeature([Vocabulary]),
   ],
   controllers: [TranslateController],
   providers: [TranslateService],
-  exports: [TranslateService]
+  exports: [TranslateService],
 })
 export class TranslateModule {}

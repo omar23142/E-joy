@@ -1,14 +1,10 @@
-
-import { Injectable, RequestTimeoutException } from "@nestjs/common"
+import { Injectable, RequestTimeoutException } from '@nestjs/common';
 import { User } from '../users/entity/User.entity';
-import { MailerService } from "@nestjs-modules/mailer";
-
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class MailService {
-  constructor(
-    private readonly mailerService: MailerService,
-  ) { }
+  constructor(private readonly mailerService: MailerService) {}
 
   private async send(
     user: User,
@@ -16,10 +12,10 @@ export class MailService {
     subject: string,
     url?: string,
   ) {
-    console.log('helow from send ')
+    console.log('helow from send ');
     try {
       const firstName = user.userName.split(' ')[0];
-      console.log(firstName)
+      console.log(firstName);
       await this.mailerService.sendMail({
         to: user.email,
         from: `suportTeam@mail.com`,
@@ -32,18 +28,15 @@ export class MailService {
         },
       });
     } catch (err) {
-      console.log(err)
-      throw new RequestTimeoutException('there is a problem happen when sending email to you');
+      console.log(err);
+      throw new RequestTimeoutException(
+        'there is a problem happen when sending email to you',
+      );
     }
   }
 
   public async sendWelcome(user: User, url?: string) {
-    await this.send(
-      user,
-      'welcome',
-      'WELCOME TO OUR FAMILY !!',
-      url,
-    );
+    await this.send(user, 'welcome', 'WELCOME TO OUR FAMILY !!', url);
   }
 
   public async sendResetPassword(user: User, resetUrl: string) {
@@ -55,12 +48,12 @@ export class MailService {
     );
   }
   public async sendValidationEmail(user: User, validationTokenUrl: string) {
-    console.log('helow from send validate')
+    console.log('helow from send validate');
     await this.send(
       user,
       'validation',
       ' EMAIL VALIDATION ',
       validationTokenUrl,
-    )
+    );
   }
 }

@@ -19,13 +19,10 @@ import { TranslateModule } from 'src/translate/translate.module';
     DictionaryModule,
     TranslateModule,
     JwtModule,
-    TypeOrmModule.forFeature([
-      Vocabulary,
-      
-    ])
+    TypeOrmModule.forFeature([Vocabulary]),
   ],
   controllers: [VocabularyController],
   providers: [VocabularyService],
-  exports:[VocabularyService]
+  exports: [VocabularyService],
 })
-export class VocabularyModule { }
+export class VocabularyModule {}

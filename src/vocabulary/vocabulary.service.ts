@@ -61,7 +61,7 @@ export class VocabularyService {
         list: listEntity ? { id: listEntity.id } : IsNull()     // IsNull() sql function , use null here is not correct
       }
     })
-    console.log('...........', existVocab)
+
     if (existVocab)
       throw new ConflictException('vocabulary already exist with same translate and context sentence')
 

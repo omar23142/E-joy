@@ -11,9 +11,10 @@ import { Vocabulary } from 'src/vocabulary/entities/vocabulary.entity';
   imports: [
     JwtModule,
     UsersModule,
-    TypeOrmModule.forFeature([Video,Vocabulary])],
+    TypeOrmModule.forFeature([Video, Vocabulary]),
+  ],
   controllers: [VideosController],
   providers: [VideosService],
-  exports: [VideosService]
+  exports: [VideosService],
 })
-export class VideosModule { }
+export class VideosModule {}

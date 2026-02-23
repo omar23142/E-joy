@@ -1,4 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CreateTranslateDto } from './dto/create-translate.dto';
 import { ProtectGard } from 'src/users/guards/Protect.guard';
 import { GetCurrentUser } from 'src/users/decorators/current-user.decorator';
@@ -7,14 +14,18 @@ import { TranslateService } from './translate.service';
 
 @Controller()
 export class TranslateController {
-  constructor(
-    private readonly translateService: TranslateService
-  ) { }
+  constructor(private readonly translateService: TranslateService) {}
   @UseGuards(ProtectGard)
   @HttpCode(HttpStatus.OK)
   @Post('/api/v1/translate')
-  create(@Body() translateDto: CreateTranslateDto, @GetCurrentUser() user: User) {
-    return this.translateService.translate(translateDto.word, translateDto.contextSentence);
+  create(
+    @Body() translateDto: CreateTranslateDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.translateService.translate(
+      translateDto.word,
+      translateDto.contextSentence,
+    );
   }
 
   //   @Roles(userType.ADMIN)
@@ -23,7 +34,6 @@ export class TranslateController {
   //   findAllForAdmin() {
   //     return this.vocabularyService.findAllForAdmin();
   //   }
-
 
   //   @UseGuards(ProtectGard)
   //   @Get('/api/v1/vocabulary')
@@ -43,14 +53,11 @@ export class TranslateController {
   //     return this.vocabularyService.update(+wordId, updateVocabularyDto, user.id);
   //   }
 
-
-
   //   @UseGuards(ProtectGard)
   //   @Delete('/api/v1/vocabulary/:wordId')
   //   remove(@Param('wordId', ParseIntPipe) wordId: number, @GetCurrentUser() user: User) {
   //     return this.vocabularyService.remove(+wordId, user.id);
   //   }
-
 
   //   @UseGuards(ProtectGard)
   //   @Delete('/api/v1/vocabulary/video/:videoId')

@@ -1,13 +1,42 @@
-// --- Mock Data Service ---
-const MOCK_SUBTITLES = [
-    { start: 0, end: 5, text: "Welcome to our advanced SQL tutorial.", translation: "أهلاً بكم في درس SQL المتقدم." },
-    { start: 5, end: 10, text: "Today we will talk about indexing.", translation: "اليوم سنتحدث عن الفهرسة (Indexing)." },
-    { start: 10, end: 15, text: "Indexing helps retrieve data faster.", translation: "تساعد الفهرسة في استرجاع البيانات بشكل أسرع." },
-    { start: 15, end: 20, text: "Let's dive into the code.", translation: "دعونا نغوص في الكود." }
-];
+﻿// --- Subtitle Management ---
+let currentSubtitles = [];       // English/Main
+let currentArabicSubtitles = []; // Arabic
+let isSubtitlesLoaded = false;
 
 // Dictionary cache to avoid repeated API calls for same word
 const dictionaryCache = {};
+
+// Drag Logic Globals
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let activeDragBox = null;
+
+// Global Drag Handlers
+document.addEventListener('mousemove', (e) => {
+    if (!isDragging || !activeDragBox) return;
+    const overlay = activeDragBox.parentElement;
+    if (!overlay) return;
+
+    const overlayRect = overlay.getBoundingClientRect();
+    let newLeft = e.clientX - overlayRect.left - dragOffsetX;
+    let newTop = e.clientY - overlayRect.top - dragOffsetY;
+    const boxRect = activeDragBox.getBoundingClientRect();
+
+    newLeft = Math.max(0, Math.min(newLeft, overlayRect.width - boxRect.width));
+    newTop = Math.max(0, Math.min(newTop, overlayRect.height - boxRect.height));
+
+    activeDragBox.style.left = `${newLeft}px`;
+    activeDragBox.style.top = `${newTop}px`;
+});
+
+document.addEventListener('mouseup', () => {
+    if (isDragging && activeDragBox) {
+        activeDragBox.classList.remove('dragging');
+        isDragging = false;
+        activeDragBox = null;
+    }
+});
 
 // API Service instance (loaded from api-service.js)
 let contentApiService = null;
@@ -86,10 +115,13 @@ async function getWordDefinition(word, contextSentence = '') {
     }
 }
 
+// Callback to trigger subtitle UI refresh from any video overlay
+let ejoyForceUpdateCallback = null;
+
 // --- Video Overlay Logic ---
 let currentVideoElement = null; // Track the current video for popup pause
-let wasManuallyPaused = false; // Track if user manually paused the video
-let isHoverPaused = false; // Track if paused due to hover/popup
+let wasManuallyPaused = false;  // Track if user manually paused the video
+let isHoverPaused = false;      // Track if paused due to hover/popup
 let currentFullscreenElement = null; // Track fullscreen element for popup positioning
 
 function initVideoOverlay() {
@@ -102,18 +134,20 @@ function initVideoOverlay() {
         const overlay = document.createElement('div');
         overlay.className = 'ejoy-video-overlay';
         overlay.innerHTML = `
-      <div class="ejoy-subtitle-box">
+      <div class="ejoy-subtitle-box ejoy-en-box">
         <div class="ejoy-subtitle-original"></div>
+      </div>
+      <div class="ejoy-subtitle-box ejoy-ar-box">
         <div class="ejoy-subtitle-translated"></div>
       </div>
     `;
 
         // Initial parenting
         let parent = video.parentElement || document.body;
-        if (getComputedStyle(parent).position === 'static') {
+        if (parent && getComputedStyle(parent).position === 'static') {
             parent.style.position = 'relative';
         }
-        parent.appendChild(overlay);
+        parent?.appendChild(overlay);
 
         // Sync Position
         function syncOverlay() {
@@ -163,8 +197,10 @@ function initVideoOverlay() {
             } else {
                 currentFullscreenElement = null; // Exited fullscreen
                 // Exited fullscreen, move back to original parent
-                if (getComputedStyle(originalParent).position === 'static') originalParent.style.position = 'relative';
-                originalParent.appendChild(overlay);
+                if (originalParent) {
+                    if (getComputedStyle(originalParent).position === 'static') originalParent.style.position = 'relative';
+                    originalParent.appendChild(overlay);
+                }
                 overlay.style.position = 'absolute';
                 syncOverlay();
             }
@@ -182,128 +218,199 @@ function initVideoOverlay() {
             }
         });
 
-        video.addEventListener('play', () => {
-            wasManuallyPaused = false;
-            isHoverPaused = false;
-        });
-
         // Subtitle visibility (simplified, always show both)
-        const subtitleOriginal = overlay.querySelector('.ejoy-subtitle-original');
-        const subtitleTranslated = overlay.querySelector('.ejoy-subtitle-translated');
-        const subtitleBox = overlay.querySelector('.ejoy-subtitle-box');
+        const originalEl = overlay.querySelector('.ejoy-subtitle-original');
+        const translatedEl = overlay.querySelector('.ejoy-subtitle-translated');
 
-        // Draggable Subtitle Box
-        let isDragging = false;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
-        let customPosition = null; // Store custom position
 
-        subtitleBox.addEventListener('mousedown', (e) => {
-            // Only start drag if clicking on the box background, not on words
-            if (e.target.classList.contains('ejoy-word-span')) return;
+        overlay.querySelectorAll('.ejoy-subtitle-box').forEach(box => {
+            box.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('ejoy-word-span')) return;
+                isDragging = true;
+                activeDragBox = box;
+                activeDragBox.classList.add('dragging');
 
-            isDragging = true;
-            subtitleBox.classList.add('dragging');
+                // Get absolute current position
+                const rect = activeDragBox.getBoundingClientRect();
+                const overlayRect = overlay.getBoundingClientRect();
 
-            // Calculate offset from mouse to box top-left
-            const rect = subtitleBox.getBoundingClientRect();
-            dragOffsetX = e.clientX - rect.left;
-            dragOffsetY = e.clientY - rect.top;
+                dragOffsetX = e.clientX - rect.left;
+                dragOffsetY = e.clientY - rect.top;
 
-            e.preventDefault(); // Prevent text selection
+                // Switch to absolute immediately to avoid flex-box interference
+                activeDragBox.style.position = 'absolute';
+                activeDragBox.style.left = `${rect.left - overlayRect.left}px`;
+                activeDragBox.style.top = `${rect.top - overlayRect.top}px`;
+                activeDragBox.style.margin = '0';
+                activeDragBox.style.transform = 'none';
+
+                e.preventDefault();
+            });
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
 
-            const overlayRect = overlay.getBoundingClientRect();
 
-            // Calculate new position relative to overlay
-            let newLeft = e.clientX - overlayRect.left - dragOffsetX;
-            let newTop = e.clientY - overlayRect.top - dragOffsetY;
+        // Subtitle Sync Logic using Index Tracking & Offset (Adaptive approach)
+        let currentIndexEN = 0;
+        let currentIndexAR = 0;
+        // Adaptive Offset: 1.5s for YouTube, 0.1s for other platforms
+        const OFFSET = window.location.href.includes('youtube.com') ? 1.5 : 0.1;
+        let syncAnimationFrame;
 
-            // Constrain within overlay bounds
-            const boxRect = subtitleBox.getBoundingClientRect();
-            newLeft = Math.max(0, Math.min(newLeft, overlayRect.width - boxRect.width));
-            newTop = Math.max(0, Math.min(newTop, overlayRect.height - boxRect.height));
-
-            // Apply custom position
-            customPosition = { left: newLeft, top: newTop };
-            subtitleBox.style.position = 'absolute';
-            subtitleBox.style.left = `${newLeft}px`;
-            subtitleBox.style.top = `${newTop}px`;
-            subtitleBox.style.transform = 'none'; // Override any centering
-            subtitleBox.style.margin = '0'; // Remove margin
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                subtitleBox.classList.remove('dragging');
+        const updateSubtitles = () => {
+            if (currentSubtitles.length === 0 && currentArabicSubtitles.length === 0) {
+                if (!video.paused && !video.ended) {
+                    syncAnimationFrame = requestAnimationFrame(updateSubtitles);
+                }
+                return;
             }
-        });
 
-        // Subtitle Logic
-        video.addEventListener('timeupdate', () => {
-            const currentTime = video.currentTime;
-            const sub = MOCK_SUBTITLES.find(s => currentTime >= s.start && currentTime < s.end);
+            const t = video.currentTime + OFFSET;
 
-            const originalEl = overlay.querySelector('.ejoy-subtitle-original');
-            const translatedEl = overlay.querySelector('.ejoy-subtitle-translated');
+            // --- 1. Lookup English ---
+            if (currentSubtitles.length > 0) {
+                while (currentIndexEN < currentSubtitles.length - 1 && t > currentSubtitles[currentIndexEN].end) currentIndexEN++;
+                while (currentIndexEN > 0 && t < currentSubtitles[currentIndexEN].start) currentIndexEN--;
+            }
 
-            if (sub) {
+            let displayEn = null;
+            if (currentSubtitles.length > 0) {
+                const subEn = currentSubtitles[currentIndexEN];
+                if (subEn && t >= subEn.start && t <= subEn.end) displayEn = subEn;
+                else if (subEn && t > subEn.end && t - subEn.end < 0.5) displayEn = subEn;
+            }
+
+            // --- 2. Lookup Arabic ---
+            if (currentArabicSubtitles.length > 0) {
+                while (currentIndexAR < currentArabicSubtitles.length - 1 && t > currentArabicSubtitles[currentIndexAR].end) currentIndexAR++;
+                while (currentIndexAR > 0 && t < currentArabicSubtitles[currentIndexAR].start) currentIndexAR--;
+            }
+
+            let displayAr = null;
+            if (currentArabicSubtitles.length > 0) {
+                const subAr = currentArabicSubtitles[currentIndexAR];
+                if (subAr && t >= subAr.start && t <= subAr.end) displayAr = subAr;
+                else if (subAr && t > subAr.end && t - subAr.end < 0.5) displayAr = subAr;
+            }
+
+            // --- 3. Update UI ---
+            if (displayEn || displayAr) {
                 overlay.style.opacity = "1";
 
-                if (originalEl.dataset.currentText !== sub.text) {
-                    originalEl.innerHTML = '';
-                    sub.text.split(' ').forEach(word => {
-                        const span = document.createElement('span');
-                        span.className = 'ejoy-word-span';
-                        span.textContent = word + ' ';
-
-                        // Hover -> Pause (only if video was playing)
-                        span.addEventListener('mouseenter', () => {
-                            if (!video.paused) {
-                                isHoverPaused = true;
-                                video.pause();
+                // English Box
+                if (displayEn) {
+                    if (originalEl.dataset.currentText !== displayEn.text) {
+                        originalEl.innerHTML = '';
+                        const tokens = displayEn.text.match(/[\p{L}\p{N}'’]+|[^\p{L}\p{N}\s]+|\s+/gu) || [];
+                        tokens.forEach(token => {
+                            if (/[\p{L}\p{N}'’]+/u.test(token)) {
+                                const span = document.createElement('span');
+                                span.className = 'ejoy-word-span';
+                                span.textContent = token;
+                                span.addEventListener('mouseenter', () => {
+                                    if (!video.paused) { isHoverPaused = true; video.pause(); }
+                                    currentVideoElement = video;
+                                });
+                                span.addEventListener('mouseleave', () => {
+                                    if (isHoverPaused && !wasManuallyPaused && !activePopup) { video.play(); isHoverPaused = false; }
+                                });
+                                span.addEventListener('click', async (e) => {
+                                    e.stopPropagation();
+                                    isHoverPaused = true; video.pause();
+                                    const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
+                                    const quickTranslate = document.createElement('div');
+                                    quickTranslate.className = 'ejoy-quick-translate';
+                                    const cached = Object.keys(dictionaryCache).find(k => k.startsWith(cleanWord.toLowerCase() + ':'));
+                                    quickTranslate.textContent = cached ? (dictionaryCache[cached].translation || dictionaryCache[cached][0]) : (displayAr ? displayAr.text.split(' ').slice(0, 5).join(' ') + '...' : '...');
+                                    span.appendChild(quickTranslate);
+                                    setTimeout(() => quickTranslate.remove(), 2500);
+                                    const rect = span.getBoundingClientRect();
+                                    showPopup(rect.left, rect.bottom + 5, cleanWord, displayEn.text);
+                                });
+                                originalEl.appendChild(span);
+                            } else {
+                                originalEl.appendChild(document.createTextNode(token));
                             }
-                            currentVideoElement = video; // Track current video
                         });
+                        originalEl.dataset.currentText = displayEn.text;
+                    }
+                } else {
+                    originalEl.textContent = "";
+                    originalEl.dataset.currentText = "";
+                }
 
-                        // Mouse Leave -> Resume (only if we paused it, not manually paused)
-                        span.addEventListener('mouseleave', () => {
-                            if (isHoverPaused && !wasManuallyPaused && !activePopup) {
-                                video.play();
-                                isHoverPaused = false;
-                            }
-                        });
-
-                        // Click -> Popup
-                        span.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            // Keep video paused while popup is open
-                            isHoverPaused = true;
-                            video.pause();
-                            currentVideoElement = video; // Track for popup interaction
-
-                            const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
-                            const rect = span.getBoundingClientRect();
-
-                            // Position popup below the word using viewport coordinates
-                            // PASS SUBTITLE TEXT AS CONTEXT
-                            showPopup(rect.left, rect.bottom + 5, cleanWord, sub.text);
-                        });
-
-                        originalEl.appendChild(span);
-                    });
-                    originalEl.dataset.currentText = sub.text;
-                    translatedEl.textContent = sub.translation;
+                // Arabic Box
+                if (displayAr) {
+                    overlay.querySelector('.ejoy-ar-box').style.display = 'block';
+                    if (translatedEl.dataset.currentTranslation !== displayAr.text) {
+                        translatedEl.textContent = displayAr.text;
+                        translatedEl.dataset.currentTranslation = displayAr.text;
+                    }
+                } else {
+                    translatedEl.textContent = "";
+                    translatedEl.dataset.currentTranslation = "";
+                    overlay.querySelector('.ejoy-ar-box').style.display = 'none';
                 }
             } else {
                 originalEl.textContent = "";
                 originalEl.dataset.currentText = "";
                 translatedEl.textContent = "";
+                translatedEl.dataset.currentTranslation = "";
                 overlay.style.opacity = "0";
+                overlay.querySelector('.ejoy-ar-box').style.display = 'none';
+            }
+
+            // Only queue next frame if playing
+            if (!video.paused && !video.ended) {
+                syncAnimationFrame = requestAnimationFrame(updateSubtitles);
+            }
+        };
+
+        video.addEventListener('play', () => {
+            wasManuallyPaused = false;
+            isHoverPaused = false;
+            cancelAnimationFrame(syncAnimationFrame);
+            syncAnimationFrame = requestAnimationFrame(updateSubtitles);
+        });
+
+        video.addEventListener('pause', () => {
+            if (!isHoverPaused) {
+                wasManuallyPaused = true;
+            }
+            cancelAnimationFrame(syncAnimationFrame);
+            updateSubtitles(); // Final update to reflect state
+        });
+
+        // Initialize sync loop if video is already playing
+        if (!video.paused) {
+            syncAnimationFrame = requestAnimationFrame(updateSubtitles);
+        }
+
+        // Register a global callback so onMessage can trigger an update
+        ejoyForceUpdateCallback = () => {
+            cancelAnimationFrame(syncAnimationFrame);
+            syncAnimationFrame = requestAnimationFrame(updateSubtitles);
+        };
+
+        // Suppress host subtitles periodically
+        const suppressHostSubs = () => {
+            const selectors = ['.ytp-caption-window-container', '.ytp-caption-segment', '.video-subtitles', '.player-timedtext', '.subtitle-overlay'];
+            selectors.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el && el.style.display !== 'none') el.style.display = 'none';
+            });
+        };
+        const suppressionInterval = setInterval(suppressHostSubs, 1000);
+        suppressHostSubs();
+
+        // Keep timeupdate as a fallback or for seeking
+        video.addEventListener('timeupdate', () => {
+            if (!isSubtitlesLoaded || currentSubtitles.length === 0) {
+                parseTextTracks(video);
+            }
+            // If the loop isn't running (e.g. paused), force an update once
+            if (video.paused) {
+                updateSubtitles();
             }
         });
     });
@@ -326,7 +433,6 @@ let activePopup = null;
 async function showPopup(x, y, text, contextSentence = '', isFullscreen = false) {
     if (activePopup) activePopup.remove();
 
-    // Show loading popup first
     const popup = document.createElement('div');
     popup.className = 'ejoy-popup-card';
     popup.style.position = 'fixed';
@@ -343,7 +449,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
     popup.style.top = `${topPos}px`;
     popup.style.zIndex = '2147483647';
 
-    // Header helper
     const getHeaderHtml = (user = null) => `
     <div class="ejoy-popup-header">
       <div style="display:flex; flex-direction:column;">
@@ -354,7 +459,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
     </div>
     `;
 
-    // 1. Check Authentication first
     const token = contentApiService.getToken();
     if (!token) {
         showAuthForm(popup, text, getHeaderHtml);
@@ -363,7 +467,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         return;
     }
 
-    // Show loading state
     popup.innerHTML = `
     ${getHeaderHtml()}
     <div style="padding: 20px; text-align: center;">
@@ -376,7 +479,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
 
     setupPopupEvents(popup);
 
-    // Fetch word data and lists
     let wordData, userLists, currentUser;
     try {
         [wordData, userLists, currentUser] = await Promise.all([
@@ -390,13 +492,9 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         userLists = [];
     }
 
-    // Default selected translation
     let selectedTranslation = wordData.translation;
-
-    // Default Save Mode: 'both' (List & Video)
     let saveMode = 'both';
 
-    // Update popup with actual content
     popup.innerHTML = `
     ${getHeaderHtml(currentUser)}
     
@@ -446,7 +544,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
             <button id="ejoy-cancel-list-btn" class="ejoy-cancel-list-btn">✕</button>
         </div>
 
-        <!-- NEW Unified Split Button -->
         <div class="ejoy-split-btn-container">
             <button class="ejoy-add-btn-main">Add to Vocabulary</button>
             <button class="ejoy-add-btn-arrow">▼</button>
@@ -465,7 +562,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
     </div>
   `;
 
-    // Sync dropdown text when list changes
     const listSelectEl = popup.querySelector('#ejoy-list-select');
     const targetListLabels = popup.querySelectorAll('.ejoy-target-list');
     if (listSelectEl) {
@@ -475,7 +571,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         });
     }
 
-    // Translation Selection Logic
     const translationItems = popup.querySelectorAll('.ejoy-main-translation');
     translationItems.forEach(item => {
         item.addEventListener('click', () => {
@@ -485,16 +580,14 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         });
     });
 
-    // Logout Listener
     const logoutBtn = popup.querySelector('#ejoy-logout');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             await contentApiService.logout();
-            showPopup(x, y, text); // Re-render to show login
+            showPopup(x, y, text);
         });
     }
 
-    // Dropdown Logic
     const dropdownArrow = popup.querySelector('.ejoy-add-btn-arrow');
     const dropdownMenu = popup.querySelector('.ejoy-dropdown-menu');
     const dropdownItems = popup.querySelectorAll('.ejoy-dropdown-item');
@@ -517,8 +610,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
             dropdownItems.forEach(i => i.querySelector('input').checked = false);
             item.querySelector('input').checked = true;
             dropdownMenu.classList.remove('active');
-
-            // Update UI based on mode
             if (saveMode === 'video') {
                 listArea.style.opacity = '0.5';
                 listArea.style.pointerEvents = 'none';
@@ -529,19 +620,16 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         });
     });
 
-
-    // Tabs Switching
-    const tabs = popup.querySelectorAll('.ejoy-tab-btn');
-    tabs.forEach(tab => {
+    const tabsButtons = popup.querySelectorAll('.ejoy-tab-btn');
+    tabsButtons.forEach(tab => {
         tab.addEventListener('click', (e) => {
             popup.querySelectorAll('.ejoy-tab-btn').forEach(t => t.classList.remove('active'));
             popup.querySelectorAll('.ejoy-tab-pane').forEach(p => p.classList.remove('active'));
-            e.target.classList.add('active');
-            popup.querySelector(`#tab-${e.target.dataset.tab}`).classList.add('active');
+            tab.classList.add('active');
+            popup.querySelector(`#tab-${tab.dataset.tab}`).classList.add('active');
         });
     });
 
-    // List Management & Add Button
     const listSelect = popup.querySelector('#ejoy-list-select');
     const newListBtn = popup.querySelector('#ejoy-new-list-btn');
     const createListForm = popup.querySelector('#ejoy-create-list-form');
@@ -592,8 +680,6 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
                 language: 'en',
                 contextSentence: contextSentence || wordData.context || '',
                 timeStamp: (saveMode !== 'list' && currentVideoElement) ? Math.floor(currentVideoElement.currentTime) : 0,
-                // If it's video only, we might want to let backend handle list? 
-                // In your backend, listId is used to findOne. 
                 listId: saveMode === 'video' ? undefined : (listSelect ? parseInt(listSelect.value) : undefined),
                 videoDetailes: videoDetails
             };
@@ -633,7 +719,6 @@ function showAuthForm(popup, text, getHeaderHtml) {
         </div>
         `;
 
-
         popup.querySelector('#ejoy-auth-toggle').addEventListener('click', () => {
             mode = mode === 'signin' ? 'signup' : 'signin';
             render();
@@ -659,7 +744,6 @@ function showAuthForm(popup, text, getHeaderHtml) {
                     render();
                     return;
                 }
-                // Succession: Re-run showPopup
                 const rect = { left: parseInt(popup.style.left), bottom: parseInt(popup.style.top) };
                 showPopup(rect.left, rect.bottom, text);
             } catch (err) {
@@ -673,7 +757,6 @@ function showAuthForm(popup, text, getHeaderHtml) {
     render();
 }
 
-// Helper for Draggable Popups (Uses Event Delegation)
 function setupPopupEvents(p) {
     if (p.dataset.eventsInitialized) return;
     p.dataset.eventsInitialized = "true";
@@ -685,12 +768,9 @@ function setupPopupEvents(p) {
         if (!isDraggingPopup) return;
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-
         p.style.left = `${initialLeft + dx}px`;
         p.style.top = `${initialTop + dy}px`;
         p.style.transform = 'none';
-
-        // Prevent selection
         window.getSelection().removeAllRanges();
     };
 
@@ -704,35 +784,26 @@ function setupPopupEvents(p) {
         }
     };
 
-    // Use delegation for all clicks and drags
     p.addEventListener('mousedown', (e) => {
         const header = e.target.closest('.ejoy-popup-header');
         if (!header) return;
-
-        // Interactive elements inside header should not start a drag
         if (e.target.closest('.ejoy-popup-close') || e.target.closest('.ejoy-logout-link') || e.target.closest('.ejoy-user-info')) return;
-
         isDraggingPopup = true;
         startX = e.clientX;
         startY = e.clientY;
-
         const rect = p.getBoundingClientRect();
         initialLeft = rect.left;
         initialTop = rect.top;
-
         p.classList.add('dragging');
         document.body.style.userSelect = 'none';
         p.style.transform = 'none';
-
         e.preventDefault();
         e.stopPropagation();
-
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
     });
 
     p.addEventListener('click', async (e) => {
-        // Close Button
         const closeBtn = e.target.closest('.ejoy-popup-close');
         if (closeBtn) {
             e.stopPropagation();
@@ -744,26 +815,13 @@ function setupPopupEvents(p) {
             isHoverPaused = false;
             return;
         }
-
-        // Logout Link
-        const logoutBtn = e.target.closest('#ejoy-logout');
-        if (logoutBtn) {
-            e.stopPropagation();
-            await contentApiService.logout();
-            p.remove();
-            activePopup = null;
-            return;
-        }
     });
 }
 
-// Plain Text Selection Listener
 document.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
-
     if (e.target.closest('.ejoy-video-overlay') || e.target.closest('.ejoy-popup-card')) return;
-
     if (activeBubble && !activeBubble.contains(e.target)) {
         activeBubble.remove();
         activeBubble = null;
@@ -771,14 +829,12 @@ document.addEventListener('mouseup', (e) => {
     if (activePopup && !activePopup.contains(e.target)) {
         activePopup.remove();
         activePopup = null;
-        // Resume video when popup closes (only if we paused it, not user)
         if (currentVideoElement && isHoverPaused && !wasManuallyPaused) {
             currentVideoElement.play();
         }
         isHoverPaused = false;
         currentVideoElement = null;
     }
-
     if (text.length > 0 && text.length < 50) {
         setTimeout(() => {
             if (window.getSelection().toString().trim() === text) {
@@ -790,25 +846,201 @@ document.addEventListener('mouseup', (e) => {
 
 function showBubble(x, y, text) {
     if (activeBubble) activeBubble.remove();
-
     const bubble = document.createElement('div');
     bubble.className = 'ejoy-bubble-btn';
     bubble.textContent = '+';
     bubble.style.left = `${x + 10}px`;
     bubble.style.top = `${y - 40}px`;
-
     document.body.appendChild(bubble);
     activeBubble = bubble;
-
     bubble.addEventListener('click', (e) => {
         e.stopPropagation();
-        showBubblePopup(x, y, text); // Reuse or adapt logic ?? Using showPopup is fine
+        showPopup(x, y, text);
         bubble.remove();
         activeBubble = null;
     });
 }
 
-// Helper wrapper to ensure signature matches
-function showBubblePopup(x, y, text) {
-    showPopup(x, y, text);
+function parseTextTracks(videoElement) {
+    if (!videoElement || !videoElement.textTracks || videoElement.textTracks.length === 0) return;
+    let enTrack = null;
+    let arTrack = null;
+    for (let i = 0; i < videoElement.textTracks.length; i++) {
+        const track = videoElement.textTracks[i];
+        if (track.language.startsWith('en') || track.label.toLowerCase().includes('english')) {
+            enTrack = track;
+        } else if (track.language.startsWith('ar') || track.label.toLowerCase().includes('arabic')) {
+            arTrack = track;
+        }
+    }
+    if (enTrack) {
+        if (enTrack.mode === 'disabled') enTrack.mode = 'hidden';
+        setTimeout(() => {
+            if (enTrack.cues && enTrack.cues.length > 0 && !isSubtitlesLoaded) {
+                const extractedSubs = [];
+                for (let i = 0; i < enTrack.cues.length; i++) {
+                    const cue = enTrack.cues[i];
+                    extractedSubs.push({
+                        start: cue.startTime,
+                        end: cue.endTime,
+                        text: cue.text,
+                        translation: "جارٍ جلب الترجمة..."
+                    });
+                }
+                if (arTrack) {
+                    if (arTrack.mode === 'disabled') arTrack.mode = 'hidden';
+                    setTimeout(() => {
+                        if (arTrack.cues && arTrack.cues.length > 0) {
+                            extractedSubs.forEach(sub => {
+                                const match = Array.from(arTrack.cues).find(ac =>
+                                    (ac.startTime >= sub.start && ac.startTime <= sub.end) ||
+                                    (ac.endTime >= sub.start && ac.endTime <= sub.end) ||
+                                    (sub.start >= ac.startTime && sub.start <= ac.endTime)
+                                );
+                                if (match) sub.translation = match.text;
+                                else sub.translation = "---";
+                            });
+                        }
+                    }, 100);
+                }
+                currentSubtitles = extractedSubs;
+                isSubtitlesLoaded = true;
+                console.log("[E-Joy] Step 1: Subtitles loaded from video.textTracks (Faster)");
+            }
+        }, 100);
+    }
 }
+
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    if (message.type === 'EJOY_SUBTITLE_FOUND') {
+        const subUrl = message.payload.url.toLowerCase();
+        console.log("[E-Joy] Message Received. URL:", subUrl);
+        try {
+            // Smart Language Detection
+            const urlParams = new URLSearchParams(subUrl.split('?')[1] || '');
+            const lang = urlParams.get('lang') || '';
+            const tlang = urlParams.get('tlang') || '';
+
+            // Determine subtitle type
+            // - Arabic: lang=ar, OR lang=en with tlang=ar (YouTube machine translation to Arabic)
+            // - English: lang=en with no tlang, or tlang=en
+            // - SKIP: any other tlang (e.g. tlang=vi = Vietnamese) to avoid wrong text in English box
+            let isArabic = lang === 'ar' || (lang === 'en' && tlang === 'ar') || tlang === 'ar';
+            let isEnglish = !isArabic && (lang === 'en' && (tlang === '' || tlang === 'en'));
+
+            // Also handle non-YouTube patterns (.ar., _ar., etc.)
+            if (!isArabic && !isEnglish) {
+                if (subUrl.includes('.ar.') || subUrl.includes('_ar.')) isArabic = true;
+                else if (subUrl.includes('.en.') || subUrl.includes('_en.')) isEnglish = true;
+            }
+
+            // Skip irrelevant languages
+            if (!isArabic && !isEnglish) {
+                console.log(`[E-Joy] Skipping irrelevant language: lang=${lang}, tlang=${tlang}`);
+                return;
+            }
+
+            console.log(`[E-Joy] Identified as: ${isArabic ? 'ARABIC' : 'ENGLISH'} (lang=${lang}, tlang=${tlang})`);
+
+            if (!message.payload.text) {
+                console.warn("[E-Joy] Subtitle payload has no text.");
+                return;
+            }
+
+            const text = message.payload.text;
+            let parsedNewCues = [];
+
+            if (subUrl.includes('.vtt') || text.includes('WEBVTT')) {
+                parsedNewCues = parseVTT(text);
+            } else if (subUrl.includes('.json') || subUrl.includes('timedtext')) {
+                const jsonData = JSON.parse(text);
+                parsedNewCues = parseYouTubeJSON(jsonData);
+            }
+
+            if (parsedNewCues.length > 0) {
+                if (isArabic) {
+                    console.log("%c[E-Joy] ARABIC Subtitles Loaded ✅", "color: #00ff00; font-weight: bold;");
+                    currentArabicSubtitles = parsedNewCues;
+                } else {
+                    console.log(`[E-Joy] English Subtitles Loaded (${parsedNewCues.length} cues)`);
+                    currentSubtitles = parsedNewCues;
+                    isSubtitlesLoaded = true;
+                }
+                console.log("[E-Joy] Step 2: Independent Sync UI Ready.");
+                // Trigger update even if video is paused
+                if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+            }
+        } catch (error) {
+            console.error('[E-Joy] Error processing subtitle message:', error);
+        }
+    }
+});
+
+function parseVTT(vttText) {
+    const lines = vttText.split(/\r?\n/);
+    const cues = [];
+    let currentCue = null;
+    const timeRegex = /(?:(\d{2,}):)?(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(?:(\d{2,}):)?(\d{2}):(\d{2})\.(\d{3})/;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line === 'WEBVTT') continue;
+        const timeMatch = line.match(timeRegex);
+        if (timeMatch) {
+            currentCue = {
+                start: parseTime(timeMatch[1], timeMatch[2], timeMatch[3], timeMatch[4]),
+                end: parseTime(timeMatch[5], timeMatch[6], timeMatch[7], timeMatch[8]),
+                text: "",
+                translation: "جارٍ المعالجة..."
+            };
+            cues.push(currentCue);
+        } else if (currentCue && !line.includes('-->')) {
+            const cleanText = line.replace(/<[^>]+>/g, '');
+            currentCue.text += (currentCue.text ? " " : "") + cleanText;
+        }
+    }
+    return cues;
+}
+
+function parseTime(hours, minutes, seconds, milliseconds) {
+    let totalSeconds = 0;
+    if (hours) totalSeconds += parseInt(hours) * 3600;
+    totalSeconds += parseInt(minutes) * 60;
+    totalSeconds += parseInt(seconds);
+    totalSeconds += parseInt(milliseconds) / 1000;
+    return totalSeconds;
+}
+
+function parseYouTubeJSON(jsonData) {
+    const cues = [];
+    if (!jsonData || !jsonData.events) return cues;
+    jsonData.events.forEach(event => {
+        if (!event.segs || event.segs.length === 0) return;
+        const eventStart = (event.tStartMs || 0) / 1000;
+        const eventDuration = (event.dDurationMs || 2000) / 1000;
+        const eventEnd = eventStart + eventDuration;
+        const hasOffsets = event.segs.some(s => s.tOffsetMs !== undefined && s.tOffsetMs > 0);
+        if (hasOffsets) {
+            let accumulatedText = "";
+            event.segs.forEach((seg, index) => {
+                const segText = seg.utf8 || "";
+                accumulatedText += segText;
+                const cleanText = accumulatedText.replace(/\n+/g, ' ').trim();
+                if (!cleanText) return;
+                let subStart = eventStart + (seg.tOffsetMs || 0) / 1000;
+                let subEnd = eventEnd;
+                if (index < event.segs.length - 1) {
+                    const nextSeg = event.segs[index + 1];
+                    if (nextSeg.tOffsetMs !== undefined) subEnd = eventStart + (nextSeg.tOffsetMs / 1000);
+                }
+                cues.push({ start: subStart, end: Math.max(subStart + 0.1, subEnd), text: cleanText, translation: "جارٍ المعالجة..." });
+            });
+        } else {
+            let fullText = event.segs.map(s => s.utf8 || "").join('').trim();
+            if (fullText) {
+                cues.push({ start: eventStart, end: eventEnd, text: fullText, translation: "جارٍ المعالجة..." });
+            }
+        }
+    });
+    return cues.sort((a, b) => a.start - b.start);
+}
+

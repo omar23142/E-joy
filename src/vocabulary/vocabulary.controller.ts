@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { VocabularyService } from './vocabulary.service';
 import { CreateVocabularyDto } from './dto/create-vocabulary.dto';
 import { UpdateVocabularyDto } from './dto/update-vocabulary.dto';
@@ -11,11 +21,14 @@ import { userType } from 'src/utils/enum';
 
 @Controller()
 export class VocabularyController {
-  constructor(private readonly vocabularyService: VocabularyService) { }
+  constructor(private readonly vocabularyService: VocabularyService) {}
 
   @UseGuards(ProtectGard)
   @Post('/api/v1/vocabulary')
-  create(@Body() createVocabularyDto: CreateVocabularyDto, @GetCurrentUser() user: User) {
+  create(
+    @Body() createVocabularyDto: CreateVocabularyDto,
+    @GetCurrentUser() user: User,
+  ) {
     return this.vocabularyService.create(createVocabularyDto, user);
   }
 
@@ -26,7 +39,6 @@ export class VocabularyController {
     return this.vocabularyService.findAllForAdmin();
   }
 
-
   @UseGuards(ProtectGard)
   @Get('/api/v1/vocabulary')
   findAll(@GetCurrentUser() user: User) {
@@ -35,28 +47,38 @@ export class VocabularyController {
 
   @UseGuards(ProtectGard)
   @Get('/api/v1/vocabulary/:wordId')
-  findOne(@Param('wordId', ParseIntPipe) wordId: number, @GetCurrentUser() user: User) {
+  findOne(
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @GetCurrentUser() user: User,
+  ) {
     return this.vocabularyService.findOne(+wordId, user.id);
   }
 
   @UseGuards(ProtectGard)
   @Patch('/api/v1/vocabulary/:wordId')
-  update(@Param('wordId', ParseIntPipe) wordId: number, @Body() updateVocabularyDto: UpdateVocabularyDto, @GetCurrentUser() user: User) {
+  update(
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @Body() updateVocabularyDto: UpdateVocabularyDto,
+    @GetCurrentUser() user: User,
+  ) {
     return this.vocabularyService.update(+wordId, updateVocabularyDto, user.id);
   }
 
-
-
   @UseGuards(ProtectGard)
   @Delete('/api/v1/vocabulary/:wordId')
-  remove(@Param('wordId', ParseIntPipe) wordId: number, @GetCurrentUser() user: User) {
+  remove(
+    @Param('wordId', ParseIntPipe) wordId: number,
+    @GetCurrentUser() user: User,
+  ) {
     return this.vocabularyService.remove(+wordId, user.id);
   }
 
-  
   @UseGuards(ProtectGard)
   @Delete('/api/v1/vocabulary/video/:videoId')
-  deleteAllVocabForSpicificVideo(@Param('videoId', ParseIntPipe) videoId: number, @GetCurrentUser() user: User) {
+  deleteAllVocabForSpicificVideo(
+    @Param('videoId', ParseIntPipe) videoId: number,
+    @GetCurrentUser() user: User,
+  ) {
     return this.vocabularyService.removeVideoActivity(videoId, user.id);
   }
 }

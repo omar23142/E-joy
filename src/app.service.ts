@@ -4,9 +4,9 @@ const NLPCloudClient = require('nlpcloud');
 
 @Injectable()
 export class AppService {
-  constructor(private readonly config: Authconfig) { }
+  constructor(private readonly config: Authconfig) {}
   getHello(): string {
-    console.log(process.env.NODE_ENV)
+    console.log(process.env.NODE_ENV);
     //console.log(this.config.jwt_secret_key)
     // const res = await fetch("https://libretranslate.com/translate", {
     //   method: "POST",
@@ -20,7 +20,6 @@ export class AppService {
     // });
 
     // console.log(await res.json());
-
 
     //     const fetch = require("node-fetch");
     //     const url = require("url");
@@ -86,17 +85,23 @@ export class AppService {
     const NLPCloudClient = require('nlpcloud');
     console.log(process.env.NLPCLOUD_API_KEY);
 
-    const client = new NLPCloudClient({ model: 'nllb-200-3-3b', token: process.env.NLPCLOUD_API_KEY })
+    const client = new NLPCloudClient({
+      model: 'nllb-200-3-3b',
+      token: process.env.NLPCLOUD_API_KEY,
+    });
     // Returns an Axios promise with the results.
-    // In case of success, results are contained in `response.data`. 
-    // In case of failure, you can retrieve the status code in `err.response.status` 
+    // In case of success, results are contained in `response.data`.
+    // In case of failure, you can retrieve the status code in `err.response.status`
     // and the error message in `err.response.data.detail`.
-    client.translation({
-      text: `John Doe has been working for Microsoft in Seattle since 1999.`
-      , source: 'eng_Latn', target: 'arb_Arab'
-    }).then(function (response) {
-      console.log(response.data);
-    })
+    client
+      .translation({
+        text: `John Doe has been working for Microsoft in Seattle since 1999.`,
+        source: 'eng_Latn',
+        target: 'arb_Arab',
+      })
+      .then(function (response) {
+        console.log(response.data);
+      })
       .catch(function (err) {
         console.error(err.response.status);
         console.error(err.response.data.detail);

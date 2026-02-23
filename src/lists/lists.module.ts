@@ -12,13 +12,11 @@ import { Vocabulary } from 'src/vocabulary/entities/vocabulary.entity';
   imports: [
     JwtModule,
     UsersModule,
-    forwardRef(()=>VocabularyModule),
-    TypeOrmModule.forFeature([
-      Lists,
-      Vocabulary
-    ])],
+    forwardRef(() => VocabularyModule),
+    TypeOrmModule.forFeature([Lists, Vocabulary]),
+  ],
   controllers: [ListsController],
   providers: [ListsService],
-  exports: [ListsService]
+  exports: [ListsService],
 })
-export class ListsModule { }
+export class ListsModule {}
