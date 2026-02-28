@@ -2,6 +2,7 @@
 let currentSubtitles = [];       // English/Main
 let currentArabicSubtitles = []; // Arabic
 let isSubtitlesLoaded = false;
+let subtitlesSource = '';
 
 // Dictionary cache to avoid repeated API calls for same word
 const dictionaryCache = {};
@@ -51,48 +52,86 @@ async function initContentScript() {
 // Call init on script load
 initContentScript();
 
-// Fetch word definition from backend and external dictionary
-async function getWordDefinition(word, contextSentence = '') {
-    const cacheKey = `${word.toLowerCase()}:${contextSentence}`;
+// Fetch word definition with support for different modes (full, fast, word)
+async function getWordDefinition(word, contextSentence = '', mode = 'full') {
+    const cacheKey = `${mode}:${word.toLowerCase()}:${contextSentence}`;
 
     if (dictionaryCache[cacheKey]) {
         return dictionaryCache[cacheKey];
     }
 
     try {
-        // 1. Fetch translations from our backend using context if available
-        const translateResponse = await contentApiService.translate(word, contextSentence, 'en').catch(() => []);
-        const translations = Array.isArray(translateResponse) ? translateResponse : (translateResponse.translation ? [translateResponse.translation] : [word]);
+        let translations = [];
+        // 1. Fetch translations from our backend
+        if (mode === 'fast') {
+            const fastRes = await contentApiService.fastTranslate(word, contextSentence).catch(() => null);
+            // new API returns an array, parse it safely
+            let fastArr = [];
+            try {
+                fastArr = typeof fastRes === 'string' ? JSON.parse(fastRes) : fastRes;
+            } catch (e) {
+                fastArr = [fastRes];
+            }
+            translations = Array.isArray(fastArr) ? fastArr : (fastArr ? [fastArr] : []);
+        } else if (mode === 'word') {
+            const wordRes = await contentApiService.fastTranslateForWord(word, contextSentence).catch(() => null);
+            let wordArr = [];
+            try {
+                wordArr = typeof wordRes === 'string' ? JSON.parse(wordRes) : wordRes;
+            } catch (e) {
+                wordArr = [wordRes];
+            }
+            translations = Array.isArray(wordArr) ? wordArr : (wordArr ? [wordArr] : []);
+        } else {
+            // Default full translation (multiple suggestions)
+            const translateResponse = await contentApiService.translate(word, contextSentence, 'en').catch(() => []);
+            translations = Array.isArray(translateResponse) ? translateResponse : (translateResponse.translation ? [translateResponse.translation] : [word]);
+        }
 
-        // 2. Fetch extra details from Free Dictionary API
+        if (translations.length === 0) {
+            // Return empty if not found, don't fallback to heavy full mode automatically
+            return {
+                slang: 'Word',
+                translation: word,
+                translations: [],
+                definition: 'Not found locally.',
+                context: '',
+                synonyms: '-'
+            };
+        }
+
+        // 2. Fetch extra details from Free Dictionary API (only for full mode)
         let extraDetails = {
             definition: 'Definition not found.',
             synonyms: '-',
-            context: contextSentence, // Default to our captured context
+            context: contextSentence,
             slang: 'Word'
         };
 
-        try {
-            const dictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-            if (dictResponse.ok) {
-                const data = await dictResponse.json();
-                const entry = data[0];
-                if (entry) {
-                    const firstMeaning = entry.meanings[0];
-                    if (firstMeaning) {
-                        extraDetails.definition = firstMeaning.definitions[0]?.definition || extraDetails.definition;
-                        extraDetails.context = firstMeaning.definitions[0]?.example || '';
-                        extraDetails.slang = firstMeaning.partOfSpeech || 'Word';
-                        extraDetails.synonyms = firstMeaning.synonyms?.slice(0, 5).join(', ') || entry.meanings.flatMap(m => m.synonyms).slice(0, 5).join(', ') || '-';
+        if (mode === 'full') {
+            try {
+                const dictResponse = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+                if (dictResponse.ok) {
+                    const data = await dictResponse.json();
+                    const entry = data[0];
+                    if (entry) {
+                        const firstMeaning = entry.meanings[0];
+                        if (firstMeaning) {
+                            extraDetails.definition = firstMeaning.definitions[0]?.definition || extraDetails.definition;
+                            extraDetails.context = firstMeaning.definitions[0]?.example || '';
+                            extraDetails.slang = firstMeaning.partOfSpeech || 'Word';
+                            extraDetails.synonyms = firstMeaning.synonyms?.slice(0, 5).join(', ') || entry.meanings.flatMap(m => m.synonyms).slice(0, 5).join(', ') || '-';
+                        }
                     }
                 }
+            } catch (e) {
+                console.warn('External dictionary fetch failed', e);
             }
-        } catch (e) {
-            console.warn('External dictionary fetch failed', e);
         }
 
         const wordData = {
             slang: extraDetails.slang,
+            // Main translation is the first item in the array
             translation: translations[0] || word,
             translations: translations,
             definition: extraDetails.definition,
@@ -115,8 +154,91 @@ async function getWordDefinition(word, contextSentence = '') {
     }
 }
 
+// --- Smart Mapping Helpers ---
+
+// Normalize Arabic text by removing diacritics and common prefixes
+function normalizeArabic(text) {
+    if (!text) return '';
+    return text
+        .replace(/[\u064B-\u0652]/g, "") // Remove harakat (diacritics)
+        .replace(/^(ال|وال|بال|فال|لل)/, "") // Remove common prefixes (Al-, Wa-, Bi-, Fa-, Li-)
+        .replace(/[إأآا]/g, "ا") // Normalize Alef
+        .replace(/ة\b/g, "ه") // Normalize Teh Marbuta
+        .replace(/ى\b/g, "ي") // Normalize Alef Maksura
+        .trim();
+}
+
+// Extract an approximate root for Arabic words by removing common affixes
+function extractArabicRoot(text) {
+    if (!text) return '';
+    let root = normalizeArabic(text);
+
+    // Remove common prefixes
+    root = root.replace(/^(ال|وال|فال|بال|لل|ك|ب|س|يت|ي|ت|ن|ا|م)/, "");
+
+    // Remove common suffixes
+    root = root.replace(/(ها|هم|هن|كم|كن|نا|ني|ي|ك|ه|ون|ين|ات|ان|ة|ت)$/, "");
+
+    // Fallback if we stripped too much (roots are usually 3 letters)
+    if (root.length < 3) {
+        return normalizeArabic(text);
+    }
+    return root.trim();
+}
+
+// Find the best matching Arabic word from a sentence based on candidate translations
+function findContextualMatch(candidates, sentence) {
+    if (!sentence || !candidates || candidates.length === 0) return null;
+
+    // Clean and split sentence into words
+    const sentenceWords = sentence.split(/\s+/).map(w => {
+        const original = w.replace(/[^\u0621-\u064A]/g, ""); // Keep only Arabic letters for matching
+        return {
+            original: original,
+            normalized: normalizeArabic(original),
+            root: extractArabicRoot(original)
+        };
+    });
+
+    const candidateObjs = candidates.map(c => {
+        const firstWord = c.split(/[,;:]+/)[0].trim();
+        return {
+            original: firstWord,
+            normalized: normalizeArabic(firstWord),
+            root: extractArabicRoot(firstWord)
+        };
+    });
+
+    // 1. Precise Match (Normalized)
+    for (const candidate of candidateObjs) {
+        if (!candidate.normalized) continue;
+        const match = sentenceWords.find(sw => sw.normalized === candidate.normalized);
+        if (match) return match.original;
+    }
+
+    // 2. Root Match 
+    for (const candidate of candidateObjs) {
+        if (!candidate.root || candidate.root.length < 3) continue;
+        const match = sentenceWords.find(sw => sw.root === candidate.root || sw.root.includes(candidate.root) || candidate.root.includes(sw.root));
+        if (match) return match.original;
+    }
+
+    // 3. Contains Match (Fuzzy)
+    for (const candidate of candidateObjs) {
+        if (!candidate.normalized || candidate.normalized.length < 3) continue;
+        const match = sentenceWords.find(sw => sw.normalized.includes(candidate.normalized) || candidate.normalized.includes(sw.normalized));
+        if (match) return match.original;
+    }
+
+    return null; // No good match found
+}
+
+
 // Callback to trigger subtitle UI refresh from any video overlay
 let ejoyForceUpdateCallback = null;
+let courseraTranscriptObserver = null;
+let courseraTranscriptPollTimer = null;
+let lastCourseraTranscriptHash = '';
 
 // --- Video Overlay Logic ---
 let currentVideoElement = null; // Track the current video for popup pause
@@ -133,11 +255,14 @@ function initVideoOverlay() {
         // Create Overlay with subtitle box wrapper (removed toggle buttons)
         const overlay = document.createElement('div');
         overlay.className = 'ejoy-video-overlay';
+        if (window.location.href.includes('youtube.com')) {
+            overlay.classList.add('ejoy-site-youtube');
+        } else if (window.location.href.includes('coursera.org')) {
+            overlay.classList.add('ejoy-site-coursera');
+        }
         overlay.innerHTML = `
-      <div class="ejoy-subtitle-box ejoy-en-box">
+      <div class="ejoy-subtitle-box">
         <div class="ejoy-subtitle-original"></div>
-      </div>
-      <div class="ejoy-subtitle-box ejoy-ar-box">
         <div class="ejoy-subtitle-translated"></div>
       </div>
     `;
@@ -253,8 +378,8 @@ function initVideoOverlay() {
         // Subtitle Sync Logic using Index Tracking & Offset (Adaptive approach)
         let currentIndexEN = 0;
         let currentIndexAR = 0;
-        // Adaptive Offset: 1.5s for YouTube, 0.1s for other platforms
-        const OFFSET = window.location.href.includes('youtube.com') ? 1.5 : 0.1;
+        // Adaptive Offset: keep Coursera at 0 to avoid EN/AR drift from differing cue timings
+        const OFFSET = window.location.href.includes('coursera.org') ? 0 : (window.location.href.includes('youtube.com') ? 2.7 : 1.2);
         let syncAnimationFrame;
 
         const updateSubtitles = () => {
@@ -307,12 +432,48 @@ function initVideoOverlay() {
                                 const span = document.createElement('span');
                                 span.className = 'ejoy-word-span';
                                 span.textContent = token;
-                                span.addEventListener('mouseenter', () => {
+                                span.addEventListener('mouseenter', async () => {
                                     if (!video.paused) { isHoverPaused = true; video.pause(); }
                                     currentVideoElement = video;
-                                });
-                                span.addEventListener('mouseleave', () => {
+
+                                    // Show smart quick translation on hover
+                                    if (displayAr && displayAr.text) {
+                                        const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
+
+                                        // Trigger both requests simultaneously
+                                        const localPromise = getWordDefinition(cleanWord, displayEn ? displayEn.text : '', 'word');
+                                        const externalPromise = contentApiService.externalTranslate(cleanWord).catch(() => null);
+
+                                        // Ensure capsule starts fresh
+                                        const quickTranslate = document.createElement('div');
+                                        quickTranslate.className = 'ejoy-quick-translate hover-capsule';
+                                        quickTranslate.textContent = '...'; // loading state
+                                        span.appendChild(quickTranslate);
+
+                                        // 1. Initial Local Result
+                                        const wordData = await localPromise;
+                                        if (span.contains(quickTranslate)) { // prevent updating if user already hovered away
+                                            const localMatch = findContextualMatch(wordData.translations, displayAr.text);
+                                            quickTranslate.textContent = localMatch || wordData.translation;
+                                        }
+
+                                        // 2. Background External API Enrichment
+                                        externalPromise.then(extTranslations => {
+                                            if (extTranslations && Array.isArray(extTranslations) && extTranslations.length > 0) {
+                                                if (span.contains(quickTranslate)) {
+                                                    const extMatch = findContextualMatch(extTranslations, displayAr.text);
+                                                    if (extMatch && extMatch !== quickTranslate.textContent) {
+                                                        // Update the hover box smoothly to the perfect contextual match!
+                                                        quickTranslate.textContent = extMatch;
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    }
+                                }); span.addEventListener('mouseleave', () => {
                                     if (isHoverPaused && !wasManuallyPaused && !activePopup) { video.play(); isHoverPaused = false; }
+                                    // Remove hover capsules
+                                    span.querySelectorAll('.hover-capsule').forEach(el => el.remove());
                                 });
                                 span.addEventListener('click', async (e) => {
                                     e.stopPropagation();
@@ -341,7 +502,7 @@ function initVideoOverlay() {
 
                 // Arabic Box
                 if (displayAr) {
-                    overlay.querySelector('.ejoy-ar-box').style.display = 'block';
+                    translatedEl.style.display = 'block';
                     if (translatedEl.dataset.currentTranslation !== displayAr.text) {
                         translatedEl.textContent = displayAr.text;
                         translatedEl.dataset.currentTranslation = displayAr.text;
@@ -349,7 +510,7 @@ function initVideoOverlay() {
                 } else {
                     translatedEl.textContent = "";
                     translatedEl.dataset.currentTranslation = "";
-                    overlay.querySelector('.ejoy-ar-box').style.display = 'none';
+                    translatedEl.style.display = 'none';
                 }
             } else {
                 originalEl.textContent = "";
@@ -357,7 +518,7 @@ function initVideoOverlay() {
                 translatedEl.textContent = "";
                 translatedEl.dataset.currentTranslation = "";
                 overlay.style.opacity = "0";
-                overlay.querySelector('.ejoy-ar-box').style.display = 'none';
+                translatedEl.style.display = 'none';
             }
 
             // Only queue next frame if playing
@@ -405,11 +566,18 @@ function initVideoOverlay() {
 
         // Keep timeupdate as a fallback for seeking
         video.addEventListener('timeupdate', () => {
+            if (window.location.href.includes('coursera.org') && subtitlesSource !== 'coursera-transcript') {
+                loadCourseraTranscriptCues(video);
+            }
             if (!isSubtitlesLoaded || currentSubtitles.length === 0) {
                 parseTextTracks(video);
             }
             if (video.paused) updateSubtitles();
         });
+
+        if (window.location.href.includes('coursera.org')) {
+            initCourseraTranscriptSync(video);
+        }
 
         // === Coursera: Eager textTracks activation ===
         // Try immediately, and also after a short delay for late-loading tracks
@@ -419,7 +587,10 @@ function initVideoOverlay() {
 
         // === Coursera / Generic: DOM Scraping for VTT URLs ===
         if (window.location.href.includes('coursera.org')) {
+            // Eager scraping for Coursera
+            scrapeCoursera();
             setTimeout(() => scrapeCoursera(), 2000);
+            setTimeout(() => scrapeCoursera(), 5000); // Late loading
         }
     });
 }
@@ -428,6 +599,25 @@ const observer = new MutationObserver((mutations) => {
     initVideoOverlay();
 });
 observer.observe(document.body, { childList: true, subtree: true });
+
+// --- SPA Navigation Handling (for Coursera/YouTube) ---
+let lastUrl = window.location.href;
+setInterval(() => {
+    if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        console.log('[E-Joy] Navigation detected (URL changed). Re-scanning for subtitles...');
+        // Reset state for new video
+        isSubtitlesLoaded = false;
+        subtitlesSource = '';
+        currentSubtitles = [];
+        currentArabicSubtitles = [];
+        currentIndexEN = 0;
+        currentIndexAR = 0;
+        lastCourseraTranscriptHash = '';
+        // Re-run initialization
+        initVideoOverlay();
+    }
+}, 2000);
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initVideoOverlay);
 } else {
@@ -475,37 +665,97 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
         return;
     }
 
-    popup.innerHTML = `
-    ${getHeaderHtml()}
-    <div style="padding: 20px; text-align: center;">
-      <div style="color: #666;">Loading translation...</div>
-    </div>
-  `;
+    // Simultaneously fetch fast and full translations
+    const fastPromise = getWordDefinition(text, contextSentence, 'word');
+    const fullPromise = getWordDefinition(text, contextSentence, 'full');
+    const listsPromise = contentApiService.getLists().catch(() => []);
+    const userPromise = contentApiService.getCurrentUser().catch(() => null);
 
+    // Render loading state
+    popup.innerHTML = `
+        ${getHeaderHtml()}
+        <div style="padding: 20px; text-align: center; color: #666;">
+            Searching results...
+        </div>
+    `;
     document.body.appendChild(popup);
     activePopup = popup;
+    setupPopupEvents(popup, x, y, text);
 
-    setupPopupEvents(popup);
+    // Initial render when fast data arrives
+    const fastData = await fastPromise;
+    if (activePopup !== popup) return;
 
-    let wordData, userLists, currentUser;
-    try {
-        [wordData, userLists, currentUser] = await Promise.all([
-            getWordDefinition(text, contextSentence),
-            contentApiService.getLists().catch(e => []),
-            contentApiService.getCurrentUser().catch(e => null)
-        ]);
-    } catch (e) {
-        console.error("Error fetching data", e);
-        wordData = await getWordDefinition(text, contextSentence);
-        userLists = [];
+    // Render with empty lists initially to show meaning ASAP
+    renderPopupBody(popup, text, fastData, [], null, getHeaderHtml);
+
+    // Background enrichment for User details and Lists
+    Promise.all([listsPromise, userPromise]).then(([userLists, currentUser]) => {
+        if (activePopup === popup) {
+            const listSelect = popup.querySelector('#ejoy-list-select');
+            if (listSelect) {
+                listSelect.innerHTML = userLists.length ? userLists.map(l => `<option value="${l.id}">${l.name}</option>`).join('') : '<option value="1">General</option>';
+            }
+            const targetLists = popup.querySelectorAll('.ejoy-target-list');
+            targetLists.forEach(el => el.textContent = userLists.length ? userLists[0].name : 'General');
+        }
+    });
+
+    // Background enrichment for full translation data
+    fullPromise.then(fullData => {
+        if (activePopup === popup) {
+            updatePopupContent(popup, fullData);
+        }
+    });
+}
+
+function updatePopupContent(popup, wordData) {
+    if (!popup) return;
+    const updateElement = (selector, content) => {
+        const el = popup.querySelector(selector);
+        if (el) el.textContent = content;
+    };
+
+    // Update Quick Result if it was English or empty
+    const quickVal = popup.querySelector('.ejoy-quick-val');
+    if (quickVal && (quickVal.textContent === quickVal.dataset.originalWord || !/[ا-ي]/.test(quickVal.textContent))) {
+        if (wordData.translation && /[ا-ي]/.test(wordData.translation)) {
+            quickVal.textContent = wordData.translation;
+        }
     }
 
+    updateElement('#tab-synonyms .ejoy-text-content', wordData.synonyms || 'No synonyms found.');
+    updateElement('#tab-definition .ejoy-text-content', wordData.definition || 'No definition found.');
+    updateElement('#tab-slang .ejoy-text-content', wordData.slang || 'N/A');
+
+    const exPane = popup.querySelector('#tab-examples .ejoy-context-box');
+    if (exPane) exPane.textContent = `"${wordData.context || 'No examples available.'}"`;
+
+    const list = popup.querySelector('.ejoy-translation-list');
+    if (list) {
+        if (Array.isArray(wordData.translations) && wordData.translations.length > 0) {
+            list.innerHTML = wordData.translations.map((t, i) =>
+                `<div class="ejoy-main-translation ${i === 0 ? 'selected' : ''}" data-index="${i}">${t}</div>`
+            ).join('');
+            setupTranslationClicks(popup);
+        } else {
+            list.innerHTML = `<div class="ejoy-loading-text">No detailed suggestions found.</div>`;
+        }
+    }
+}
+
+function renderPopupBody(popup, text, wordData, userLists, currentUser, getHeaderHtml) {
     let selectedTranslation = wordData.translation;
     let saveMode = 'both';
 
     popup.innerHTML = `
     ${getHeaderHtml(currentUser)}
     
+    <div class="ejoy-quick-result">
+        <div class="ejoy-label-sm">Quick Result</div>
+        <div class="ejoy-quick-val" data-original-word="${text}">${wordData.translation}</div>
+    </div>
+
     <div class="ejoy-tabs-nav">
       <button class="ejoy-tab-btn active" data-tab="translation">Translation</button>
       <button class="ejoy-tab-btn" data-tab="synonyms">Synonyms</button>
@@ -516,25 +766,28 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
 
     <div class="ejoy-tab-content">
       <div class="ejoy-tab-pane active" id="tab-translation">
+        <div class="ejoy-label-sm">Detailed Suggestions</div>
         <div class="ejoy-translation-list">
-            ${Array.isArray(wordData.translations) ? wordData.translations.map((t, i) => `<div class="ejoy-main-translation ${i === 0 ? 'selected' : ''}" data-index="${i}">${t}</div>`).join('') : `<div class="ejoy-main-translation selected" data-index="0">${wordData.translation}</div>`}
+            ${Array.isArray(wordData.translations) && wordData.translations.length > 0
+            ? wordData.translations.map((t, i) => `<div class="ejoy-main-translation ${i === 0 ? 'selected' : ''}" data-index="${i}">${t}</div>`).join('')
+            : `<div class="ejoy-loading-text">Loading detailed suggestions...</div>`}
         </div>
       </div>
 
       <div class="ejoy-tab-pane" id="tab-synonyms">
-        <div class="ejoy-text-content">${wordData.synonyms || 'No synonyms found.'}</div>
+        <div class="ejoy-text-content">${wordData.synonyms || 'Loading synonyms...'}</div>
       </div>
 
       <div class="ejoy-tab-pane" id="tab-examples">
-        <div class="ejoy-context-box">"${wordData.context || 'No examples available.'}"</div>
+        <div class="ejoy-context-box">"${wordData.context || 'Loading examples...'}"</div>
       </div>
 
       <div class="ejoy-tab-pane" id="tab-definition">
-        <div class="ejoy-text-content">${wordData.definition || 'No definition found.'}</div>
+        <div class="ejoy-text-content">${wordData.definition || 'Loading definition...'}</div>
       </div>
 
       <div class="ejoy-tab-pane" id="tab-slang">
-        <div class="ejoy-text-content">${wordData.slang || 'N/A'}</div>
+        <div class="ejoy-text-content">${wordData.slang || '...'}</div>
       </div>
     </div>
 
@@ -563,87 +816,50 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
                     <input type="radio" name="save-mode"> Save to <span class="ejoy-target-list">${userLists.length ? userLists[0].name : 'General'}</span> only
                 </div>
                 <div class="ejoy-dropdown-item" data-mode="video">
-                    <input type="radio" name="save-mode"> Save with Video only
+                    <input type="radio" name="save-mode"> Save Activity only
                 </div>
             </div>
         </div>
     </div>
-  `;
+    `;
 
-    const listSelectEl = popup.querySelector('#ejoy-list-select');
-    const targetListLabels = popup.querySelectorAll('.ejoy-target-list');
-    if (listSelectEl) {
-        listSelectEl.addEventListener('change', () => {
-            const selectedName = listSelectEl.options[listSelectEl.selectedIndex].text;
-            targetListLabels.forEach(label => label.textContent = selectedName);
-        });
-    }
-
-    const translationItems = popup.querySelectorAll('.ejoy-main-translation');
-    translationItems.forEach(item => {
-        item.addEventListener('click', () => {
-            translationItems.forEach(i => i.classList.remove('selected'));
-            item.classList.add('selected');
-            selectedTranslation = item.textContent.trim();
-        });
-    });
-
-    const logoutBtn = popup.querySelector('#ejoy-logout');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            await contentApiService.logout();
-            showPopup(x, y, text);
-        });
-    }
-
-    const dropdownArrow = popup.querySelector('.ejoy-add-btn-arrow');
-    const dropdownMenu = popup.querySelector('.ejoy-dropdown-menu');
-    const dropdownItems = popup.querySelectorAll('.ejoy-dropdown-item');
-    const listArea = popup.querySelector('#ejoy-list-area');
-
-    dropdownArrow.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdownMenu.classList.toggle('active');
-    });
-
-    document.addEventListener('click', (e) => {
-        if (dropdownMenu && !dropdownMenu.contains(e.target)) {
-            dropdownMenu.classList.remove('active');
-        }
-    });
-
-    dropdownItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            saveMode = item.dataset.mode;
-            dropdownItems.forEach(i => i.querySelector('input').checked = false);
-            item.querySelector('input').checked = true;
-            dropdownMenu.classList.remove('active');
-            if (saveMode === 'video') {
-                listArea.style.opacity = '0.5';
-                listArea.style.pointerEvents = 'none';
-            } else {
-                listArea.style.opacity = '1';
-                listArea.style.pointerEvents = 'auto';
-            }
-        });
-    });
-
+    setupTabEvents(popup);
+    setupTranslationClicks(popup);
+    setupVocabularyEvents(popup, text, wordData, userLists, selectedTranslation, saveMode);
+}
+function setupTabEvents(popup) {
     const tabsButtons = popup.querySelectorAll('.ejoy-tab-btn');
     tabsButtons.forEach(tab => {
-        tab.addEventListener('click', (e) => {
+        tab.addEventListener('click', () => {
             popup.querySelectorAll('.ejoy-tab-btn').forEach(t => t.classList.remove('active'));
             popup.querySelectorAll('.ejoy-tab-pane').forEach(p => p.classList.remove('active'));
             tab.classList.add('active');
-            popup.querySelector(`#tab-${tab.dataset.tab}`).classList.add('active');
+            const targetPane = popup.querySelector(`#tab-${tab.dataset.tab}`);
+            if (targetPane) targetPane.classList.add('active');
         });
     });
+}
 
+function setupVocabularyEvents(popup, text, wordData, userLists, selectedTranslation, saveMode) {
     const listSelect = popup.querySelector('#ejoy-list-select');
+    const targetListLabels = popup.querySelectorAll('.ejoy-target-list');
     const newListBtn = popup.querySelector('#ejoy-new-list-btn');
     const createListForm = popup.querySelector('#ejoy-create-list-form');
     const saveListBtn = popup.querySelector('#ejoy-save-list-btn');
     const cancelListBtn = popup.querySelector('#ejoy-cancel-list-btn');
     const newListInput = popup.querySelector('#ejoy-new-list-input');
+    const dropdownArrow = popup.querySelector('.ejoy-add-btn-arrow');
+    const dropdownMenu = popup.querySelector('.ejoy-dropdown-menu');
+    const dropdownItems = popup.querySelectorAll('.ejoy-dropdown-item');
+    const listArea = popup.querySelector('#ejoy-list-area');
+    const addBtn = popup.querySelector('.ejoy-add-btn-main');
+
+    if (listSelect) {
+        listSelect.addEventListener('change', () => {
+            const selectedName = listSelect.options[listSelect.selectedIndex].text;
+            targetListLabels.forEach(label => label.textContent = selectedName);
+        });
+    }
 
     if (newListBtn) {
         newListBtn.addEventListener('click', () => createListForm.classList.add('active'));
@@ -659,54 +875,74 @@ async function showPopup(x, y, text, contextSentence = '', isFullscreen = false)
                 option.selected = true;
                 listSelect.add(option);
                 createListForm.classList.remove('active');
+                targetListLabels.forEach(label => label.textContent = newList.name);
             } catch (e) { alert('Failed to create list'); }
         });
     }
 
-    popup.querySelector('.ejoy-add-btn-main').addEventListener('click', async (e) => {
-        const btn = e.target;
-        const originalText = btn.textContent;
-        btn.textContent = "Saving...";
-        btn.disabled = true;
+    if (dropdownArrow) {
+        dropdownArrow.addEventListener('click', (e) => { e.stopPropagation(); dropdownMenu.classList.toggle('active'); });
+        document.addEventListener('click', (e) => { if (dropdownMenu && !dropdownMenu.contains(e.target)) dropdownMenu.classList.remove('active'); });
+    }
 
-        try {
-            let videoDetails = null;
-            if (saveMode === 'both' || saveMode === 'video') {
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', () => {
+            saveMode = item.dataset.mode;
+            dropdownItems.forEach(i => i.querySelector('input').checked = false);
+            item.querySelector('input').checked = true;
+            dropdownMenu.classList.remove('active');
+            if (saveMode === 'video') {
+                listArea.style.opacity = '0.5';
+                listArea.style.pointerEvents = 'none';
+            } else {
+                listArea.style.opacity = '1';
+                listArea.style.pointerEvents = 'auto';
+            }
+        });
+    });
+
+    if (addBtn) {
+        addBtn.addEventListener('click', async () => {
+            const originalText = addBtn.textContent;
+            addBtn.textContent = "Saving...";
+            addBtn.disabled = true;
+
+            try {
                 const videoElement = currentVideoElement || document.querySelector('video');
-                if (videoElement) {
-                    videoDetails = {
+                const vocabData = {
+                    word: text,
+                    selectedTranslate: popup.querySelector('.ejoy-main-translation.selected')?.textContent?.trim() || selectedTranslation,
+                    language: 'en',
+                    contextSentence: wordData.context || '',
+                    timeStamp: (saveMode !== 'list' && videoElement) ? Math.floor(videoElement.currentTime) : 0,
+                    listId: saveMode === 'video' ? undefined : (listSelect ? parseInt(listSelect.value) : undefined),
+                    videoDetailes: (saveMode === 'both' || saveMode === 'video') ? {
                         originalUrl: window.location.href,
                         platform: window.location.href.includes('youtube') ? 'youtube' : 'other',
                         title: document.title
-                    };
-                }
+                    } : null
+                };
+
+                await contentApiService.createVocabulary(vocabData);
+                addBtn.textContent = "Saved ✓";
+                addBtn.style.background = "#95a5a6";
+                setTimeout(() => { addBtn.textContent = originalText; addBtn.disabled = false; addBtn.style.background = ""; }, 2000);
+            } catch (error) {
+                addBtn.textContent = "Error";
+                addBtn.disabled = false;
+                setTimeout(() => { addBtn.textContent = originalText; }, 2000);
             }
+        });
+    }
+}
 
-            const vocabData = {
-                word: text,
-                selectedTranslate: selectedTranslation,
-                language: 'en',
-                contextSentence: contextSentence || wordData.context || '',
-                timeStamp: (saveMode !== 'list' && currentVideoElement) ? Math.floor(currentVideoElement.currentTime) : 0,
-                listId: saveMode === 'video' ? undefined : (listSelect ? parseInt(listSelect.value) : undefined),
-                videoDetailes: videoDetails
-            };
-
-            await contentApiService.createVocabulary(vocabData);
-            btn.textContent = "Saved ✓";
-            btn.style.background = "#95a5a6";
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-                btn.style.background = "";
-            }, 2000);
-        } catch (error) {
-            btn.textContent = "Error";
-            btn.disabled = false;
-            setTimeout(() => {
-                btn.textContent = originalText;
-            }, 2000);
-        }
+function setupTranslationClicks(popup) {
+    const translationItems = popup.querySelectorAll('.ejoy-main-translation');
+    translationItems.forEach(item => {
+        item.addEventListener('click', () => {
+            translationItems.forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+        });
     });
 }
 
@@ -765,7 +1001,7 @@ function showAuthForm(popup, text, getHeaderHtml) {
     render();
 }
 
-function setupPopupEvents(p) {
+function setupPopupEvents(p, x, y, text) {
     if (p.dataset.eventsInitialized) return;
     p.dataset.eventsInitialized = "true";
 
@@ -874,23 +1110,7 @@ function showBubble(x, y, text) {
 async function batchTranslateSubtitles(cues) {
     if (!cues || cues.length === 0) return;
 
-    const cacheKey = `ejoy_ar_cache_${window.location.href}`;
-
-    // 1. Check localStorage cache first (instant load on revisit!)
-    try {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            const arCues = JSON.parse(cached);
-            if (arCues && arCues.length > 0) {
-                currentArabicSubtitles = arCues;
-                console.log(`[E-Joy] ✅ Arabic loaded from cache (${arCues.length} cues)`);
-                if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
-                return;
-            }
-        }
-    } catch (e) { /* ignore cache errors */ }
-
-    // 2. Deduplicate sentences
+    // 1. Deduplicate sentences
     const uniqueSentences = [...new Set(cues.map(c => c.text.trim()).filter(t => t.length > 0))];
     console.log(`[E-Joy] Requesting background translation for ${uniqueSentences.length} sentences...`);
 
@@ -919,21 +1139,18 @@ async function batchTranslateSubtitles(cues) {
         })).filter(c => c.text);
 
         currentArabicSubtitles = arCues;
-        console.log(`%c[E-Joy] ✅ Arabic Translation Done (via Background)`, 'color: #00ff88; font-weight: bold;');
-
-        // 6. Cache in localStorage
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(arCues));
-        } catch (e) { }
+        console.log(`%c[E-Joy] ✅ Arabic Translation Done (via Background) (${arCues.length} cues)`, 'color: #00ff88; font-weight: bold;');
 
         if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
     });
 }
 
 function parseTextTracks(videoElement) {
+    if (window.location.href.includes('coursera.org') && subtitlesSource === 'coursera-transcript') return;
     if (!videoElement || !videoElement.textTracks || videoElement.textTracks.length === 0) return;
     let enTrack = null;
     let arTrack = null;
+    const forceArFromEn = window.location.href.includes('coursera.org');
     for (let i = 0; i < videoElement.textTracks.length; i++) {
         const track = videoElement.textTracks[i];
         if (track.language.startsWith('en') || track.label.toLowerCase().includes('english')) {
@@ -947,23 +1164,27 @@ function parseTextTracks(videoElement) {
         if (enTrack.mode === 'disabled') enTrack.mode = 'hidden';
         const tryLoad = () => {
             if (enTrack.cues && enTrack.cues.length > 0 && !isSubtitlesLoaded) {
-                const extractedSubs = [];
+                const rawSubs = [];
                 for (let i = 0; i < enTrack.cues.length; i++) {
                     const cue = enTrack.cues[i];
-                    extractedSubs.push({
+                    rawSubs.push({
                         start: cue.startTime,
                         end: cue.endTime,
-                        text: cue.text.replace(/<[^>]+>/g, '').trim(),
-                        translation: '---'
+                        text: cue.text.replace(/<[^>]+>/g, '').trim()
                     });
                 }
-                currentSubtitles = extractedSubs;
+
+                // Use original cues directly (no splitting)
+                const extractedSubs = rawSubs;
+
+                currentSubtitles = extractedSubs.map(s => ({ ...s, translation: '---' }));
                 isSubtitlesLoaded = true;
-                console.log('[E-Joy] Step 1: English loaded from textTracks (' + extractedSubs.length + ' cues)');
+                subtitlesSource = 'texttrack';
+                console.log('[E-Joy] Step 1: English loaded (' + currentSubtitles.length + ' cues)');
                 if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
 
-                if (arTrack) {
-                    // Try to load Arabic from textTracks (e.g. Coursera with Arabic track)
+                if (!forceArFromEn && arTrack) {
+                    // Try to load Arabic from textTracks (non-Coursera)
                     if (arTrack.mode === 'disabled') arTrack.mode = 'hidden';
                     setTimeout(() => {
                         if (arTrack.cues && arTrack.cues.length > 0) {
@@ -981,7 +1202,7 @@ function parseTextTracks(videoElement) {
                         }
                     }, 300);
                 } else {
-                    // No Arabic track at all → batch translate via backend
+                    // Coursera (or no Arabic track): keep Arabic timing identical to English
                     batchTranslateSubtitles(extractedSubs);
                 }
             } else if (!isSubtitlesLoaded) {
@@ -1058,6 +1279,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         const subUrl = message.payload.url.toLowerCase();
         console.log("[E-Joy] Message Received. URL:", subUrl);
         try {
+            const forceArFromEn = window.location.href.includes('coursera.org');
             // Smart Language Detection
             const urlParams = new URLSearchParams(subUrl.split('?')[1] || '');
             const lang = urlParams.get('lang') || '';
@@ -1084,6 +1306,15 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 
             console.log(`[E-Joy] Identified as: ${isArabic ? 'ARABIC' : 'ENGLISH'} (lang=${lang}, tlang=${tlang})`);
 
+            if (forceArFromEn && isArabic) {
+                console.log('[E-Joy] Coursera: ignoring Arabic track to keep timing aligned with English');
+                return;
+            }
+            if (forceArFromEn && isEnglish && subtitlesSource === 'coursera-transcript') {
+                console.log('[E-Joy] Coursera: keeping transcript as primary timing source');
+                return;
+            }
+
             if (!message.payload.text) {
                 console.warn("[E-Joy] Subtitle payload has no text.");
                 return;
@@ -1104,16 +1335,18 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
                     console.log("%c[E-Joy] ARABIC Subtitles Loaded ✅", "color: #00ff00; font-weight: bold;");
                     currentArabicSubtitles = parsedNewCues;
                 } else {
-                    console.log(`[E-Joy] English Subtitles Loaded (${parsedNewCues.length} cues)`);
-                    currentSubtitles = parsedNewCues;
+                    // Use original cues directly (no splitting)
+                    const splitSubs = parsedNewCues;
+                    console.log(`[E-Joy] English Subtitles Loaded (${splitSubs.length} cues)`);
+                    currentSubtitles = splitSubs.map(s => ({ ...s, translation: '---' }));
                     isSubtitlesLoaded = true;
+                    subtitlesSource = 'external-track';
                     // If no Arabic subtitles yet, auto-translate via backend
-                    if (currentArabicSubtitles.length === 0) {
-                        batchTranslateSubtitles(parsedNewCues);
+                    if (currentArabicSubtitles.length === 0 || forceArFromEn) {
+                        batchTranslateSubtitles(splitSubs);
                     }
                 }
                 console.log("[E-Joy] Step 2: Independent Sync UI Ready.");
-                // Trigger update even if video is paused
                 if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
             }
         } catch (error) {
@@ -1145,6 +1378,59 @@ function parseVTT(vttText) {
         }
     }
     return cues;
+}
+
+// === Subtitle Granularity: Split long cues into sentence-based chunks ===
+function splitCuesBySentences(cues) {
+    const newCues = [];
+    cues.forEach(cue => {
+        // Skip splitting for short cues to prevent flicker
+        if (cue.text.length < 40) {
+            newCues.push(cue);
+            return;
+        }
+
+        // Improved Regex: Split on . ! ? only if followed by space or end of line
+        const sentences = cue.text.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g);
+
+        if (!sentences || sentences.length <= 1) {
+            newCues.push(cue);
+            return;
+        }
+
+        // Clean and merge very short fragments (less than 5 chars) to avoid single-word flicker
+        const cleanSentences = [];
+        sentences.forEach(s => {
+            const trim = s.trim();
+            if (trim.length < 5 && cleanSentences.length > 0) {
+                cleanSentences[cleanSentences.length - 1] += " " + trim;
+            } else if (trim.length > 0) {
+                cleanSentences.push(trim);
+            }
+        });
+
+        if (cleanSentences.length <= 1) {
+            newCues.push(cue);
+            return;
+        }
+
+        const totalChars = cue.text.length;
+        const duration = cue.end - cue.start;
+        let runningStart = cue.start;
+
+        cleanSentences.forEach(sentence => {
+            const sentenceDuration = (sentence.length / totalChars) * duration;
+            const end = Math.min(cue.end, runningStart + sentenceDuration);
+
+            newCues.push({
+                start: runningStart,
+                end: end,
+                text: sentence
+            });
+            runningStart = end;
+        });
+    });
+    return newCues;
 }
 
 function parseTime(hours, minutes, seconds, milliseconds) {
@@ -1188,5 +1474,133 @@ function parseYouTubeJSON(jsonData) {
         }
     });
     return cues.sort((a, b) => a.start - b.start);
+}
+
+function initCourseraTranscriptSync(videoElement) {
+    if (!window.location.href.includes('coursera.org')) return;
+
+    loadCourseraTranscriptCues(videoElement);
+
+    if (courseraTranscriptObserver) {
+        courseraTranscriptObserver.disconnect();
+    }
+    courseraTranscriptObserver = new MutationObserver(() => {
+        if (subtitlesSource !== 'coursera-transcript') {
+            loadCourseraTranscriptCues(videoElement);
+        }
+    });
+    courseraTranscriptObserver.observe(document.body, { childList: true, subtree: true });
+
+    if (courseraTranscriptPollTimer) clearInterval(courseraTranscriptPollTimer);
+    courseraTranscriptPollTimer = setInterval(() => {
+        if (subtitlesSource !== 'coursera-transcript') {
+            loadCourseraTranscriptCues(videoElement);
+        }
+    }, 1500);
+}
+
+function loadCourseraTranscriptCues(videoElement) {
+    const cues = extractCourseraTranscriptCues(videoElement);
+    if (!cues || cues.length < 3) return false;
+
+    const hash = cues.length + ':' + cues.slice(0, 12).map(c => `${c.start.toFixed(2)}|${c.text}`).join('||');
+    if (hash === lastCourseraTranscriptHash) return true;
+    lastCourseraTranscriptHash = hash;
+
+    currentSubtitles = cues.map(c => ({ ...c, translation: '---' }));
+    isSubtitlesLoaded = true;
+    subtitlesSource = 'coursera-transcript';
+    currentArabicSubtitles = [];
+    console.log(`[E-Joy] Coursera transcript loaded (${cues.length} cues)`);
+    batchTranslateSubtitles(cues);
+    if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
+    return true;
+}
+
+function extractCourseraTranscriptCues(videoElement) {
+    const roots = findCourseraTranscriptRoots();
+    if (roots.length === 0) return [];
+
+    const cues = [];
+    const seen = new Set();
+    for (const root of roots) {
+        const rows = root.querySelectorAll('button, [role="button"], li, [data-start], [data-start-time], [data-testid*="line"], [class*="line"], [class*="Line"]');
+        rows.forEach(row => {
+            const cue = parseCourseraTranscriptRow(row);
+            if (!cue) return;
+            const key = `${cue.start}|${cue.text}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            cues.push(cue);
+        });
+    }
+
+    cues.sort((a, b) => a.start - b.start);
+    if (cues.length < 3) return [];
+
+    const hasEnglishLikeContent = cues.some(c => /[A-Za-z]/.test(c.text));
+    if (!hasEnglishLikeContent) return [];
+
+    const duration = (videoElement && Number.isFinite(videoElement.duration)) ? videoElement.duration : null;
+    for (let i = 0; i < cues.length; i++) {
+        const next = cues[i + 1];
+        const fallbackEnd = duration ? duration : cues[i].start + 2;
+        cues[i].end = next ? Math.max(cues[i].start + 0.2, next.start) : Math.max(cues[i].start + 0.5, fallbackEnd);
+    }
+    return cues;
+}
+
+function findCourseraTranscriptRoots() {
+    const selectors = [
+        '[data-testid*="transcript"]',
+        '[class*="transcript"]',
+        '[class*="Transcript"]',
+        '[aria-label*="transcript" i]'
+    ];
+    const roots = [];
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(el => {
+            const text = (el.textContent || '').trim();
+            if (!text) return;
+            if (!text.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)) return;
+            roots.push(el);
+        });
+    });
+    return roots;
+}
+
+function parseCourseraTranscriptRow(row) {
+    if (!row) return null;
+
+    const attrStart = row.getAttribute('data-start') || row.getAttribute('data-start-time') || row.dataset?.start || row.dataset?.startTime;
+    let start = attrStart !== null && attrStart !== undefined && attrStart !== '' ? Number(attrStart) : null;
+    if (!Number.isFinite(start)) start = null;
+
+    const raw = (row.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return null;
+
+    const timeMatch = raw.match(/\b(\d{1,2}:\d{2}(?::\d{2})?)\b/);
+    if (start === null && timeMatch) {
+        start = parseTranscriptTimeToSeconds(timeMatch[1]);
+    }
+    if (start === null || !Number.isFinite(start)) return null;
+
+    const text = raw.replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/, '').trim();
+    if (!text) return null;
+
+    return { start, end: start + 1, text };
+}
+
+function parseTranscriptTimeToSeconds(timeString) {
+    if (!timeString) return null;
+    const parts = timeString.split(':').map(p => parseInt(p, 10));
+    if (parts.some(Number.isNaN)) return null;
+    if (parts.length === 2) {
+        return (parts[0] * 60) + parts[1];
+    }
+    if (parts.length === 3) {
+        return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    }
+    return null;
 }
 

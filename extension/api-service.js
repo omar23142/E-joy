@@ -61,10 +61,16 @@ class ApiService {
 
         try {
             const response = await fetch(url, config);
-            const data = await response.json();
+            const contentType = response.headers.get("content-type");
+            let data;
+            if (contentType && contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                data = await response.text();
+            }
 
             if (!response.ok) {
-                throw new Error(data.message || 'API request failed');
+                throw new Error(data.message || data || 'API request failed');
             }
 
             return data;
@@ -128,6 +134,27 @@ class ApiService {
         return await this.request('/api/v1/translate', {
             method: 'POST',
             body: JSON.stringify({ word, contextSentence, language }),
+        });
+    }
+
+    async fastTranslate(word, contextSentence = '', language = 'en') {
+        return await this.request('/api/v1/translate/fast', {
+            method: 'POST',
+            body: JSON.stringify({ word, contextSentence, language }),
+        });
+    }
+
+    async fastTranslateForWord(word, contextSentence = '', language = 'en') {
+        return await this.request('/api/v1/translate/word', {
+            method: 'POST',
+            body: JSON.stringify({ word, contextSentence, language }),
+        });
+    }
+
+    async externalTranslate(word, language = 'en') {
+        return await this.request('/api/v1/translate/external', {
+            method: 'POST',
+            body: JSON.stringify({ word, language }),
         });
     }
 

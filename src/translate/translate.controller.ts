@@ -34,6 +34,41 @@ export class TranslateController {
     );
   }
 
+  @UseGuards(ProtectGard)
+  @HttpCode(HttpStatus.OK)
+  @Post('/api/v1/translate/fast')
+  fastTranslate(
+    @Body() translateDto: CreateTranslateDto,
+  ) {
+    return this.translateService.fastTranslate(
+      translateDto.word,
+      translateDto.contextSentence,
+    );
+  }
+
+  @UseGuards(ProtectGard)
+  @HttpCode(HttpStatus.OK)
+  @Post('/api/v1/translate/external')
+  externalTranslate(
+    @Body() translateDto: CreateTranslateDto,
+  ) {
+    return this.translateService.translateByAPI(
+      translateDto.word,
+    );
+  }
+
+  @UseGuards(ProtectGard)
+  @HttpCode(HttpStatus.OK)
+  @Post('/api/v1/translate/word')
+  fastTranslateForWord(
+    @Body() translateDto: CreateTranslateDto,
+  ) {
+    return this.translateService.fastTranslateForWord(
+      translateDto.word,
+      translateDto.contextSentence,
+    );
+  }
+
   // Batch subtitle translation — no auth needed, translates array of sentences
   @HttpCode(HttpStatus.OK)
   @Post('/api/v1/translate/batch')

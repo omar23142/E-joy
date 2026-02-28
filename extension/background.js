@@ -206,34 +206,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleBatchTranslation(sentences) {
-    const CHUNK_SIZE = 40;
+    const CHUNK_SIZE = 50;
     const results = [];
+    const GOOGLE_CLIENTS = ['gtx', 'dict-chrome-ex', 'webapp'];
+    let currentClientIndex = 0;
 
     for (let i = 0; i < sentences.length; i += CHUNK_SIZE) {
-        const chunk = sentences.slice(i, i + CHUNK_SIZE);
-        try {
-            const joined = chunk.join('\n');
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(joined)}`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`Google: ${res.status}`);
-            const data = await res.json();
-            const translatedJoined = data[0].map(item => item[0]).join('');
-            const translatedLines = translatedJoined.split('\n');
+        // Add a healthy delay between chunks for long videos to avoid Google 429
+        if (i > 0) await new Promise(r => setTimeout(r, 800));
 
-            chunk.forEach((original, idx) => {
-                results.push({ original, translation: translatedLines[idx]?.trim() || original });
-            });
-        } catch (err) {
-            console.warn('[EJOY] Background Google Translate failed, falling back to MyMemory:', err.message);
-            for (const sentence of chunk) {
-                try {
-                    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(sentence)}&langpair=en|ar`);
-                    const data = await res.json();
-                    results.push({ original: sentence, translation: data.responseData?.translatedText || sentence });
-                } catch {
-                    results.push({ original: sentence, translation: sentence });
+        const chunk = sentences.slice(i, i + CHUNK_SIZE);
+        const joined = chunk.join('\n');
+        let success = false;
+
+        // Try alternating Google clients to bypass rate-limiting
+        for (let attempt = 0; attempt < GOOGLE_CLIENTS.length; attempt++) {
+            try {
+                const client = GOOGLE_CLIENTS[currentClientIndex];
+                const url = `https://translate.googleapis.com/translate_a/single?client=${client}&sl=en&tl=ar&dt=t&q=${encodeURIComponent(joined)}`;
+                const res = await fetch(url);
+
+                if (!res.ok) {
+                    if (res.status === 429) {
+                        console.warn(`[EJOY] Rate limit hit on client '${client}', switching API...`);
+                        currentClientIndex = (currentClientIndex + 1) % GOOGLE_CLIENTS.length;
+                        await new Promise(r => setTimeout(r, 2000)); // Chill out before retrying
+                        throw new Error(`Rate limit`);
+                    }
+                    throw new Error(`Google HTTP ${res.status}`);
                 }
+
+                const data = await res.json();
+                const translatedJoined = data[0].map(item => item[0] || '').join('');
+                const translatedLines = translatedJoined.split(/\r?\n/);
+
+                chunk.forEach((original, idx) => {
+                    results.push({ original, translation: translatedLines[idx]?.trim() || original });
+                });
+
+                success = true;
+                break; // Break the fallback loop if successful
+
+            } catch (err) {
+                console.warn(`[EJOY] Translation attempt ${attempt + 1} failed:`, err.message);
             }
+        }
+
+        // If ALL bypasses fail (extremely rare), fallback to original English to keep video playing
+        if (!success) {
+            console.error('[EJOY] All Google API endpoints failed. Using original text as fallback.');
+            chunk.forEach(s => results.push({ original: s, translation: s }));
         }
     }
     return results;

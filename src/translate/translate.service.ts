@@ -17,42 +17,60 @@ export class TranslateService {
     private readonly vocabRepo: Repository<Vocabulary>,
     private readonly dictionaryService: DictionaryService
   ) { }
+  public async fastTranslate(word: string, contextSentence: string = '') {
+    let translatedTexts: string[] = [];
+    let existTranslateWithoutCont: any[] | null = null, dictionaryTranslate: any[] | null = null;
 
-  //   public async fastTranslate(word:string, contextSentenceHashed:string, ) {
-  //     let APItranslate:string[], translatedText:string | undefined= undefined, existTranslateWithoutCont:string[] | null = null,dictionaryTranslate:any[]| null= null;
-  //     let sugestionTranslate:string[];
-  //     let existTranslate = await this.translateWithContext(word, contextSentenceHashed);
-  //   // if there translate with context
-  //   if (existTranslate.length !== 0){
-  //   console.log('ddddkkk', existTranslate[0].translation)
-  //   console.log('with contexttttttttt', existTranslate)
-  //   translatedText =  existTranslate[0].translation
-  //   }
-  //   // if there no translate with context
-  //   else  {
-  //     existTranslateWithoutCont= await this.translateWithOutContext(word);
-  //     // if there translate without context
-  //      if(existTranslateWithoutCont.length > 0)
-  //       {
-  //     console.log('without context', existTranslateWithoutCont)
-  //     translatedText = existTranslateWithoutCont[0];
-  //     // if no translate without context use dictionary
-  //   } else {
-  //     dictionaryTranslate = await this.dictionaryService.findByWord(word);
+    // Hash the context sentence to match database records
+    const contextSentenceHashed = createHash('md5').update(contextSentence || '').digest('hex');
 
-  //      if (dictionaryTranslate.length > 0){
-  //       console.log('dictionaryyyyyy',dictionaryTranslate)
-  //       translatedText = dictionaryTranslate[0].ara} 
-  //       // if no translate in the dictionary use Api
-  //       else {
-  //         APItranslate = await this.translateByAPI(word);
-  //         console.log('Api translate', APItranslate);
-  //         translatedText = APItranslate[0];
-  //   }  
-  //   }
-  // }
-  //   return translatedText;
-  //   }
+    let existTranslate = await this.translateWithContext(word, contextSentenceHashed);
+    // if there translate with context
+    if (existTranslate.length !== 0) {
+      translatedTexts = existTranslate.map(t => t.translation);
+    }
+    // if there no translate with context
+    else {
+      existTranslateWithoutCont = await this.translateWithOutContext(word);
+      // if there translate without context
+      if (existTranslateWithoutCont.length > 0) {
+        translatedTexts = existTranslateWithoutCont.map(t => t.translation);
+      } else {
+        dictionaryTranslate = await this.dictionaryService.findByWord(word);
+        if (dictionaryTranslate.length > 0) {
+          translatedTexts = dictionaryTranslate.map(d => d.ara);
+        }
+      }
+    }
+    return translatedTexts;
+  }
+
+  public async fastTranslateForWord(word: string, contextSentence: string = '') {
+    let APItranslate: string[], translatedTexts: string[] = [], existTranslateWithoutCont: any[] | null = null, dictionaryTranslate: any[] | null = null;
+
+    // Hash the context sentence to match database records
+    const contextSentenceHashed = createHash('md5').update(contextSentence || '').digest('hex');
+
+    let existTranslate = await this.translateWithContext(word, contextSentenceHashed);
+    if (existTranslate.length !== 0) {
+      translatedTexts = existTranslate.map(t => t.translation);
+    }
+    else {
+      existTranslateWithoutCont = await this.translateWithOutContext(word);
+      if (existTranslateWithoutCont.length > 0) {
+        translatedTexts = existTranslateWithoutCont.map(t => t.translation);
+      } else {
+        dictionaryTranslate = await this.dictionaryService.findByWord(word);
+        if (dictionaryTranslate.length > 0) {
+          translatedTexts = dictionaryTranslate.map(d => d.ara);
+        }
+        else {
+          translatedTexts = [];
+        }
+      }
+    }
+    return translatedTexts;
+  }
 
   public async translate(word: string, contextSentence: string = '') {
     let APItranslate: string[];
