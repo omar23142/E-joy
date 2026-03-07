@@ -1,0 +1,54 @@
+
+
+
+translate
+Get http://localhost:3000/api/v1/translate
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+### all translate for admin
+Get http://localhost:3000/api/v1/admin/translate
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+
+### single vocabulary
+Get http://localhost:3000/api/v1/translate/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MTU3NTA0fQ.ZgPxfn3H3nc8aEE6uuWKtMG_Rg3msQEGgdC5mm911r8
+
+
+
+### post
+Post http://localhost:3000/api/v1/translate
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+
+{
+    "word":"cascading",
+    "language":"en",
+    "contextSentence":""
+    }
+    
+
+
+### patch
+PATCH http://localhost:3000/api/v1/translate/4
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+
+{
+    "word":"fuck you",
+    "translation":"روح انتاك"
+}
+
+
+
+### DELETE
+DELETE  http://localhost:3000/api/v1/vocabulary/22
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+

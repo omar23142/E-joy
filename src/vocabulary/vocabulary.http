@@ -30,7 +30,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
     "word":"grand",
     "language":"en",
     "contextSentence":"",
-    "selectedTranslate":"هبة",
+    "selectedTranslate":"جَسِيم",
     "timeStamp":18,
     "listId":2,
      "videoDetailes":{
@@ -38,7 +38,6 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
          "platform":"youtube",
         "title":"sing video"
     }
-    
 }
 
 ### patch
@@ -54,7 +53,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 
 
 ### DELETE
-DELETE  http://localhost:3000/api/v1/vocabulary/22
+DELETE  http://localhost:3000/api/v1/vocabulary/49
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
 

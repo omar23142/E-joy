@@ -379,7 +379,7 @@ function initVideoOverlay() {
         let currentIndexEN = 0;
         let currentIndexAR = 0;
         // Adaptive Offset: keep Coursera at 0 to avoid EN/AR drift from differing cue timings
-        const OFFSET = window.location.href.includes('coursera.org') ? 0 : (window.location.href.includes('youtube.com') ? 2.7 : 1.2);
+        const OFFSET = window.location.href.includes('coursera.org') ? 0 : (window.location.href.includes('youtube.com') ? 0.6 : 1.2);
         let syncAnimationFrame;
 
         const updateSubtitles = () => {
@@ -405,7 +405,7 @@ function initVideoOverlay() {
                 else if (subEn && t > subEn.end && t - subEn.end < 0.5) displayEn = subEn;
             }
 
-            // --- 2. Lookup Arabic ---
+            // --- 2. Lookup Arabic (aligned to same timing as English) ---
             if (currentArabicSubtitles.length > 0) {
                 while (currentIndexAR < currentArabicSubtitles.length - 1 && t > currentArabicSubtitles[currentIndexAR].end) currentIndexAR++;
                 while (currentIndexAR > 0 && t < currentArabicSubtitles[currentIndexAR].start) currentIndexAR--;
@@ -419,106 +419,96 @@ function initVideoOverlay() {
             }
 
             // --- 3. Update UI ---
-            if (displayEn || displayAr) {
+            // Both boxes are driven by English display timing only — they appear/disappear together.
+            if (displayEn) {
                 overlay.style.opacity = "1";
 
                 // English Box
-                if (displayEn) {
-                    if (originalEl.dataset.currentText !== displayEn.text) {
-                        originalEl.innerHTML = '';
-                        const tokens = displayEn.text.match(/[\p{L}\p{N}'’]+|[^\p{L}\p{N}\s]+|\s+/gu) || [];
-                        tokens.forEach(token => {
-                            if (/[\p{L}\p{N}'’]+/u.test(token)) {
-                                const span = document.createElement('span');
-                                span.className = 'ejoy-word-span';
-                                span.textContent = token;
-                                span.addEventListener('mouseenter', async () => {
-                                    if (!video.paused) { isHoverPaused = true; video.pause(); }
-                                    currentVideoElement = video;
+                if (originalEl.dataset.currentText !== displayEn.text) {
+                    originalEl.innerHTML = '';
+                    const tokens = displayEn.text.match(/[\p{L}\p{N}'']+|[^\p{L}\p{N}\s]+|\s+/gu) || [];
+                    tokens.forEach(token => {
+                        if (/[\p{L}\p{N}'']+/u.test(token)) {
+                            const span = document.createElement('span');
+                            span.className = 'ejoy-word-span';
+                            span.textContent = token;
+                            span.addEventListener('mouseenter', async () => {
+                                if (!video.paused) { isHoverPaused = true; video.pause(); }
+                                currentVideoElement = video;
 
-                                    // Show smart quick translation on hover
-                                    if (displayAr && displayAr.text) {
-                                        const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
+                                // Show smart quick translation on hover
+                                if (displayAr && displayAr.text) {
+                                    const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
 
-                                        // Trigger both requests simultaneously
-                                        const localPromise = getWordDefinition(cleanWord, displayEn ? displayEn.text : '', 'word');
-                                        const externalPromise = contentApiService.externalTranslate(cleanWord).catch(() => null);
+                                    // Trigger both requests simultaneously
+                                    const localPromise = getWordDefinition(cleanWord, displayEn ? displayEn.text : '', 'word');
+                                    const externalPromise = contentApiService.externalTranslate(cleanWord).catch(() => null);
 
-                                        // Ensure capsule starts fresh
-                                        const quickTranslate = document.createElement('div');
-                                        quickTranslate.className = 'ejoy-quick-translate hover-capsule';
-                                        quickTranslate.textContent = '...'; // loading state
-                                        span.appendChild(quickTranslate);
+                                    // Ensure capsule starts fresh
+                                    const quickTranslate = document.createElement('div');
+                                    quickTranslate.className = 'ejoy-quick-translate hover-capsule';
+                                    quickTranslate.textContent = '...'; // loading state
+                                    span.appendChild(quickTranslate);
 
-                                        // 1. Initial Local Result
-                                        const wordData = await localPromise;
-                                        if (span.contains(quickTranslate)) { // prevent updating if user already hovered away
-                                            const localMatch = findContextualMatch(wordData.translations, displayAr.text);
-                                            quickTranslate.textContent = localMatch || wordData.translation;
-                                        }
+                                    // 1. Initial Local Result
+                                    const wordData = await localPromise;
+                                    if (span.contains(quickTranslate)) { // prevent updating if user already hovered away
+                                        const localMatch = findContextualMatch(wordData.translations, displayAr.text);
+                                        quickTranslate.textContent = localMatch || wordData.translation;
+                                    }
 
-                                        // 2. Background External API Enrichment
-                                        externalPromise.then(extTranslations => {
-                                            if (extTranslations && Array.isArray(extTranslations) && extTranslations.length > 0) {
-                                                if (span.contains(quickTranslate)) {
-                                                    const extMatch = findContextualMatch(extTranslations, displayAr.text);
-                                                    if (extMatch && extMatch !== quickTranslate.textContent) {
-                                                        // Update the hover box smoothly to the perfect contextual match!
-                                                        quickTranslate.textContent = extMatch;
-                                                    }
+                                    // 2. Background External API Enrichment
+                                    externalPromise.then(extTranslations => {
+                                        if (extTranslations && Array.isArray(extTranslations) && extTranslations.length > 0) {
+                                            if (span.contains(quickTranslate)) {
+                                                const extMatch = findContextualMatch(extTranslations, displayAr.text);
+                                                if (extMatch && extMatch !== quickTranslate.textContent) {
+                                                    quickTranslate.textContent = extMatch;
                                                 }
                                             }
-                                        });
-                                    }
-                                }); span.addEventListener('mouseleave', () => {
-                                    if (isHoverPaused && !wasManuallyPaused && !activePopup) { video.play(); isHoverPaused = false; }
-                                    // Remove hover capsules
-                                    span.querySelectorAll('.hover-capsule').forEach(el => el.remove());
-                                });
-                                span.addEventListener('click', async (e) => {
-                                    e.stopPropagation();
-                                    isHoverPaused = true; video.pause();
-                                    const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
-                                    const quickTranslate = document.createElement('div');
-                                    quickTranslate.className = 'ejoy-quick-translate';
-                                    const cached = Object.keys(dictionaryCache).find(k => k.startsWith(cleanWord.toLowerCase() + ':'));
-                                    quickTranslate.textContent = cached ? (dictionaryCache[cached].translation || dictionaryCache[cached][0]) : (displayAr ? displayAr.text.split(' ').slice(0, 5).join(' ') + '...' : '...');
-                                    span.appendChild(quickTranslate);
-                                    setTimeout(() => quickTranslate.remove(), 2500);
-                                    const rect = span.getBoundingClientRect();
-                                    showPopup(rect.left, rect.bottom + 5, cleanWord, displayEn.text);
-                                });
-                                originalEl.appendChild(span);
-                            } else {
-                                originalEl.appendChild(document.createTextNode(token));
-                            }
-                        });
-                        originalEl.dataset.currentText = displayEn.text;
-                    }
-                } else {
-                    originalEl.textContent = "";
-                    originalEl.dataset.currentText = "";
+                                        }
+                                    });
+                                }
+                            }); span.addEventListener('mouseleave', () => {
+                                if (isHoverPaused && !wasManuallyPaused && !activePopup) { video.play(); isHoverPaused = false; }
+                                span.querySelectorAll('.hover-capsule').forEach(el => el.remove());
+                            });
+                            span.addEventListener('click', async (e) => {
+                                e.stopPropagation();
+                                isHoverPaused = true; video.pause();
+                                const cleanWord = token.replace(/[\p{P}\s]+/gu, "");
+                                const quickTranslate = document.createElement('div');
+                                quickTranslate.className = 'ejoy-quick-translate';
+                                const cached = Object.keys(dictionaryCache).find(k => k.startsWith(cleanWord.toLowerCase() + ':'));
+                                quickTranslate.textContent = cached ? (dictionaryCache[cached].translation || dictionaryCache[cached][0]) : (displayAr ? displayAr.text.split(' ').slice(0, 5).join(' ') + '...' : '...');
+                                span.appendChild(quickTranslate);
+                                setTimeout(() => quickTranslate.remove(), 2500);
+                                const rect = span.getBoundingClientRect();
+                                showPopup(rect.left, rect.bottom + 5, cleanWord, displayEn.text);
+                            });
+                            originalEl.appendChild(span);
+                        } else {
+                            originalEl.appendChild(document.createTextNode(token));
+                        }
+                    });
+                    originalEl.dataset.currentText = displayEn.text;
                 }
 
-                // Arabic Box
-                if (displayAr) {
-                    translatedEl.style.display = 'block';
-                    if (translatedEl.dataset.currentTranslation !== displayAr.text) {
-                        translatedEl.textContent = displayAr.text;
-                        translatedEl.dataset.currentTranslation = displayAr.text;
-                    }
-                } else {
-                    translatedEl.textContent = "";
-                    translatedEl.dataset.currentTranslation = "";
-                    translatedEl.style.display = 'none';
+                // Arabic Box — shown together with English, hidden together with English
+                translatedEl.style.display = 'block';
+                if (displayAr && translatedEl.dataset.currentTranslation !== displayAr.text) {
+                    translatedEl.textContent = displayAr.text;
+                    translatedEl.dataset.currentTranslation = displayAr.text;
                 }
+
             } else {
+                // No English cue → hide BOTH boxes at the same time
                 originalEl.textContent = "";
                 originalEl.dataset.currentText = "";
                 translatedEl.textContent = "";
                 translatedEl.dataset.currentTranslation = "";
-                overlay.style.opacity = "0";
                 translatedEl.style.display = 'none';
+                overlay.style.opacity = "0";
             }
 
             // Only queue next frame if playing
@@ -1139,7 +1129,7 @@ async function batchTranslateSubtitles(cues) {
         })).filter(c => c.text);
 
         currentArabicSubtitles = arCues;
-        console.log(`%c[E-Joy] ✅ Arabic Translation Done (via Background) (${arCues.length} cues)`, 'color: #00ff88; font-weight: bold;');
+        console.log(`%c[E-Joy] 🇸🇦 ARABIC loaded — Source: Batch Google Translation (${arCues.length} cues) — timings copied from English`, 'color: #81c784; font-weight: bold;');
 
         if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
     });
@@ -1180,7 +1170,7 @@ function parseTextTracks(videoElement) {
                 currentSubtitles = extractedSubs.map(s => ({ ...s, translation: '---' }));
                 isSubtitlesLoaded = true;
                 subtitlesSource = 'texttrack';
-                console.log('[E-Joy] Step 1: English loaded (' + currentSubtitles.length + ' cues)');
+                console.log('%c[E-Joy] 🇬🇧 ENGLISH loaded — Source: TextTrack API (' + currentSubtitles.length + ' cues)', 'color: #4fc3f7; font-weight: bold;');
                 if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
 
                 if (!forceArFromEn && arTrack) {
@@ -1194,7 +1184,7 @@ function parseTextTracks(videoElement) {
                                 arCues.push({ start: c.startTime, end: c.endTime, text: c.text.replace(/<[^>]+>/g, '').trim() });
                             }
                             currentArabicSubtitles = arCues;
-                            console.log('[E-Joy] Arabic loaded from textTracks (' + arCues.length + ' cues)');
+                            console.log('%c[E-Joy] 🇸🇦 ARABIC loaded — Source: TextTrack API (' + arCues.length + ' cues)', 'color: #81c784; font-weight: bold;');
                             if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
                         } else {
                             // No Arabic track available → batch translate via backend
@@ -1332,12 +1322,32 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 
             if (parsedNewCues.length > 0) {
                 if (isArabic) {
-                    console.log("%c[E-Joy] ARABIC Subtitles Loaded ✅", "color: #00ff00; font-weight: bold;");
-                    currentArabicSubtitles = parsedNewCues;
+                    console.log('%c[E-Joy] 🇸🇦 ARABIC loaded — Source: Background Network Intercept (YouTube track)', 'color: #81c784; font-weight: bold;');
+                    // Align Arabic timestamps to English to ensure perfect sync.
+                    // YouTube's Arabic auto-translated track has slightly different timestamps.
+                    if (currentSubtitles.length > 0) {
+                        // Build a map: for each Arabic cue, find the English cue that has the most overlap
+                        const aligned = parsedNewCues.map(arCue => {
+                            const midpoint = (arCue.start + arCue.end) / 2;
+                            // Find English cue whose interval contains the midpoint of the Arabic cue
+                            const enCue = currentSubtitles.find(en => midpoint >= en.start && midpoint <= en.end)
+                                || currentSubtitles.reduce((best, en) => {
+                                    const dist = Math.min(Math.abs(en.start - midpoint), Math.abs(en.end - midpoint));
+                                    const bestDist = Math.min(Math.abs(best.start - midpoint), Math.abs(best.end - midpoint));
+                                    return dist < bestDist ? en : best;
+                                }, currentSubtitles[0]);
+                            return { start: enCue.start, end: enCue.end, text: arCue.text };
+                        });
+                        currentArabicSubtitles = aligned;
+                        console.log(`%c[E-Joy] 🔁 Arabic timestamps re-aligned to English (${aligned.length} cues synced)`, 'color: #ffd54f; font-weight: bold;');
+                    } else {
+                        // English not loaded yet — keep Arabic timing as-is, sync will apply when EN arrives
+                        currentArabicSubtitles = parsedNewCues;
+                    }
                 } else {
                     // Use original cues directly (no splitting)
                     const splitSubs = parsedNewCues;
-                    console.log(`[E-Joy] English Subtitles Loaded (${splitSubs.length} cues)`);
+                    console.log(`%c[E-Joy] 🇬🇧 ENGLISH loaded — Source: Background Network Intercept (${splitSubs.length} cues)`, 'color: #4fc3f7; font-weight: bold;');
                     currentSubtitles = splitSubs.map(s => ({ ...s, translation: '---' }));
                     isSubtitlesLoaded = true;
                     subtitlesSource = 'external-track';
