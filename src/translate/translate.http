@@ -24,7 +24,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6I
 ### post
 Post http://localhost:3000/api/v1/translate
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzY5MjUwNzU1fQ.HSz0B37rXUwP3o23xfdEElUAVXFRuUfNCtiGAEtvY9s
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NCwicm9sZSI6Ik5PUk1BTF9VU0VSIiwiaWF0IjoxNzgwNjU4ODA5fQ.eptxLdAI3s95rQh0M9id76vIi3QQq-UON9tGr4b5MWQ
 
 
 {
