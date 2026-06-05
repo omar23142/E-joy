@@ -54,7 +54,7 @@ function extractVideoId(urlString) {
     }
 }
 
-function fetchAndSend(targetUrl, videoId, isArabicProbe = false) {
+function fetchAndSend(targetUrl, videoId, isArabicProbe = false, senderTabId = null) {
     const key = makeDedupeKey(targetUrl);
     if (recentUrlKeys.has(key)) {
         console.log(`[EJOY] Skipping duplicate: ${key}`);
@@ -86,6 +86,12 @@ function fetchAndSend(targetUrl, videoId, isArabicProbe = false) {
 
             console.log(`[EJOY] ✅ Sending ${isArabicProbe ? 'ARABIC' : 'ENGLISH'} subtitle to Content Script. Size: ${text.length} chars`);
 
+            // If we know the exact tab (from content.js message), send directly
+            if (senderTabId) {
+                chrome.tabs.sendMessage(senderTabId, { type: 'EJOY_SUBTITLE_FOUND', payload });
+                return;
+            }
+
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const tab = tabs && tabs[0];
                 if (!tab || !tab.id) return;
@@ -99,6 +105,67 @@ function fetchAndSend(targetUrl, videoId, isArabicProbe = false) {
                 console.error('[EJOY] Subtitle fetch failed:', err.message);
             }
         });
+}
+
+// Smart Arabic URL derivation — tries multiple patterns to find Arabic subtitle from English URL
+function probeArabicVariants(url, videoId, senderTabId = null) {
+    const lower = url.toLowerCase();
+    const probeUrls = new Set();
+
+    // --- YouTube: auto-translate via tlang=ar ---
+    if (lower.includes('timedtext') || lower.includes('youtube.com') || lower.includes('googleapis.com')) {
+        // Add tlang=ar for YouTube auto-translated Arabic (most reliable for YouTube)
+        if (/[\?&]lang=en/i.test(url) && !/[\?&]tlang=/i.test(url)) {
+            const separator = url.includes('?') ? '&' : '?';
+            probeUrls.add(url + separator + 'tlang=ar');
+        }
+        // Also try native Arabic track (lang=ar)
+        if (/[\?&]lang=en/i.test(url)) {
+            probeUrls.add(url.replace(/([?&])lang=en/i, '$1lang=ar'));
+        }
+    }
+
+    // --- VTT / Generic file path patterns ---
+    // /en/ → /ar/
+    if (/\/en\//i.test(url)) probeUrls.add(url.replace(/\/en\//i, '/ar/'));
+    // /en. → /ar. (e.g. /en.vtt)
+    if (/\/en\./i.test(url)) probeUrls.add(url.replace(/\/en\./i, '/ar.'));
+    // _en. → _ar. (e.g. subtitle_en.vtt)
+    if (/_en\./i.test(url)) probeUrls.add(url.replace(/_en\./i, '_ar.'));
+    // -en. → -ar. (e.g. subtitle-en.vtt)
+    if (/-en\./i.test(url)) probeUrls.add(url.replace(/-en\./i, '-ar.'));
+    // .en. → .ar. (e.g. subtitle.en.vtt)
+    if (/\.en\./i.test(url)) probeUrls.add(url.replace(/\.en\./i, '.ar.'));
+    // en.vtt → ar.vtt (end of filename before query)
+    if (/en\.vtt/i.test(url)) probeUrls.add(url.replace(/en\.vtt/i, 'ar.vtt'));
+    // en.srt → ar.srt
+    if (/en\.srt/i.test(url)) probeUrls.add(url.replace(/en\.srt/i, 'ar.srt'));
+
+    // --- Query parameter patterns ---
+    if (/[\?&]language=en/i.test(url)) probeUrls.add(url.replace(/language=en/i, 'language=ar'));
+    if (/[\?&]lng=en/i.test(url)) probeUrls.add(url.replace(/lng=en/i, 'lng=ar'));
+    if (/[\?&]locale=en/i.test(url)) probeUrls.add(url.replace(/locale=en/i, 'locale=ar'));
+    if (/[\?&]lang=en/i.test(url) && !lower.includes('timedtext')) {
+        probeUrls.add(url.replace(/lang=en/i, 'lang=ar'));
+    }
+    // subtitleLanguage or subLang patterns
+    if (/[\?&]subtitleLanguage=en/i.test(url)) probeUrls.add(url.replace(/subtitleLanguage=en/i, 'subtitleLanguage=ar'));
+    if (/[\?&]subLang=en/i.test(url)) probeUrls.add(url.replace(/subLang=en/i, 'subLang=ar'));
+
+    // Remove original URL from probes
+    probeUrls.delete(url);
+
+    if (probeUrls.size > 0) {
+        console.log(`[EJOY] 🔍 Probing ${probeUrls.size} Arabic variant(s) for:`, url);
+        probeUrls.forEach(probeUrl => {
+            console.log('[EJOY] 🔍 → Trying:', probeUrl);
+            fetchAndSend(probeUrl, videoId, true, senderTabId);
+        });
+    } else {
+        console.log('[EJOY] No Arabic URL variants could be derived from:', url);
+    }
+
+    return probeUrls.size;
 }
 
 function onRequestFinished(details) {
@@ -129,12 +196,9 @@ function onRequestFinished(details) {
         // Step 1: Fetch as English
         fetchAndSend(url, videoId, false);
 
-        // Step 2: Probe for Arabic by replacing lang=en with lang=ar
-        const arabicUrl = url.replace('lang=en', 'lang=ar');
-        if (arabicUrl !== url) {
-            console.log('[EJOY] Probing for Arabic equivalent from English URL...');
-            fetchAndSend(arabicUrl, videoId, true);
-        }
+        // Step 2: Smart probe for Arabic (native + auto-translate + VTT patterns)
+        console.log('[EJOY] Case B: English detected — probing all Arabic variants...');
+        probeArabicVariants(url, videoId);
 
     } else if (lang === 'ar') {
         // Case C: Direct Arabic URL
@@ -144,14 +208,9 @@ function onRequestFinished(details) {
         // Case D: Other formats (.vtt, .srt, etc.) — try as English first
         fetchAndSend(url, videoId, false);
 
-        // Try generic Arabic probe patterns
-        let arabicUrl = null;
-        if (url.includes('/en/') || url.includes('/en.')) {
-            arabicUrl = url.replace('/en/', '/ar/').replace('/en.', '/ar.');
-        } else if (url.includes('_en.')) {
-            arabicUrl = url.replace('_en.', '_ar.');
-        }
-        if (arabicUrl && arabicUrl !== url) fetchAndSend(arabicUrl, videoId, true);
+        // Smart probe for Arabic using all known patterns
+        console.log('[EJOY] Case D: Generic subtitle — probing Arabic variants...');
+        probeArabicVariants(url, videoId);
     }
 }
 
@@ -191,9 +250,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
             })
             .catch(err => console.warn(`[EJOY] Coursera fetch failed: ${err.message}`));
+
+        // If we just fetched English, also probe for Arabic automatically
+        if (!isArabic) {
+            console.log('[EJOY] Coursera English received — probing Arabic variants...');
+            const tabId = sender.tab?.id || null;
+            probeArabicVariants(url, videoId, tabId);
+        }
     }
 
-    // NEW: Handle batch translation requests from content script
+    // Handle Arabic probe requests from content.js
+    if (message.type === 'EJOY_PROBE_ARABIC') {
+        const { url } = message;
+        if (!url) return;
+        const videoId = extractVideoId(url) || extractVideoId(sender.tab?.url || '') || 'probe';
+        const tabId = sender.tab?.id || null;
+        console.log('[EJOY] 📩 Content.js requested Arabic probe for:', url);
+        probeArabicVariants(url, videoId, tabId);
+    }
+
+    // Handle batch translation requests from content script
     if (message.type === 'EJOY_BATCH_TRANSLATE') {
         const { sentences } = message;
         handleBatchTranslation(sentences).then(results => {

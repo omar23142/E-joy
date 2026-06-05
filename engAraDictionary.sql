@@ -1,5 +1,5 @@
-SET client_encoding = 'UTF8';
-$env:PGCLIENTENCODING='UTF8'; & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d E-JOY -f "C:\Users\pc\Downloads\engAraDictionary.sql"
+-- SET client_encoding = 'UTF8';
+-- $env:PGCLIENTENCODING='UTF8'; & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d E-JOY -f "C:\Users\pc\Downloads\engAraDictionary.sql"
 -- phpMyAdmin SQL Dump
 -- version 4.7.1
 -- https://www.phpmyadmin.net/

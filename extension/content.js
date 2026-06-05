@@ -1,8 +1,15 @@
-﻿// --- Subtitle Management ---
+// --- Subtitle Management ---
 let currentSubtitles = [];       // English/Main
 let currentArabicSubtitles = []; // Arabic
 let isSubtitlesLoaded = false;
 let subtitlesSource = '';
+
+// Track whether Arabic subtitles were received from network intercept
+let arabicFromNetworkReceived = false;
+
+// Site detection helpers
+function isYouTube() { return window.location.href.includes('youtube.com'); }
+function isCoursera() { return window.location.href.includes('coursera.org'); }
 
 // Dictionary cache to avoid repeated API calls for same word
 const dictionaryCache = {};
@@ -604,6 +611,7 @@ setInterval(() => {
         currentIndexEN = 0;
         currentIndexAR = 0;
         lastCourseraTranscriptHash = '';
+        arabicFromNetworkReceived = false;
         // Re-run initialization
         initVideoOverlay();
     }
@@ -1095,17 +1103,29 @@ function showBubble(x, y, text) {
     });
 }
 
-// === Batch Subtitle Translation ===
-// Called after English subtitles are loaded, to auto-generate Arabic via backend
+// === Batch Subtitle Translation (API fallback — used when all Arabic probes fail) ===
+// Only used as a last resort after network probes time out
 async function batchTranslateSubtitles(cues) {
     if (!cues || cues.length === 0) return;
 
+    // If Arabic was already received from network intercept, skip API translation
+    if (arabicFromNetworkReceived && currentArabicSubtitles.length > 0) {
+        console.log('[E-Joy] Skipping batch translation — Arabic already received from network intercept');
+        return;
+    }
+
     // 1. Deduplicate sentences
     const uniqueSentences = [...new Set(cues.map(c => c.text.trim()).filter(t => t.length > 0))];
-    console.log(`[E-Joy] Requesting background translation for ${uniqueSentences.length} sentences...`);
+    console.log(`[E-Joy] Requesting background translation for ${uniqueSentences.length} sentences (Coursera API fallback)...`);
 
-    // 3. Send to background.js instead of local backend
+    // 2. Send to background.js for Google Translate API
     chrome.runtime.sendMessage({ type: 'EJOY_BATCH_TRANSLATE', sentences: uniqueSentences }, (response) => {
+        // Double-check: if Arabic arrived from network while we were waiting, don't overwrite
+        if (arabicFromNetworkReceived && currentArabicSubtitles.length > 0) {
+            console.log('[E-Joy] Arabic arrived from network during translation request — discarding API result');
+            return;
+        }
+
         if (!response || !response.success) {
             console.warn('[E-Joy] Background translation failed:', response?.error || 'No response');
             return;
@@ -1113,7 +1133,7 @@ async function batchTranslateSubtitles(cues) {
 
         const translated = response.translated; // [{original, translation}]
 
-        // 4. Build lookup map: original → arabic
+        // 3. Build lookup map: original → arabic
         const translationMap = {};
         translated.forEach(item => {
             if (item.original && item.translation) {
@@ -1121,7 +1141,7 @@ async function batchTranslateSubtitles(cues) {
             }
         });
 
-        // 5. Build Arabic cues array
+        // 4. Build Arabic cues array — use EXACT same timing as English
         const arCues = cues.map(cue => ({
             start: cue.start,
             end: cue.end,
@@ -1135,12 +1155,35 @@ async function batchTranslateSubtitles(cues) {
     });
 }
 
+// Align Arabic cues to English timing for perfect sync (1:1 mapping)
+// Uses English cue timings as the master clock
+function alignArabicToEnglish(arabicCues) {
+    if (!currentSubtitles || currentSubtitles.length === 0) return arabicCues;
+    if (!arabicCues || arabicCues.length === 0) return arabicCues;
+
+    // Strategy: for each Arabic cue, find the English cue with the best overlap
+    // and copy the English cue's start/end times
+    const aligned = arabicCues.map(arCue => {
+        const midpoint = (arCue.start + arCue.end) / 2;
+        // Find English cue whose interval contains the midpoint
+        const enCue = currentSubtitles.find(en => midpoint >= en.start && midpoint <= en.end)
+            || currentSubtitles.reduce((best, en) => {
+                const dist = Math.min(Math.abs(en.start - midpoint), Math.abs(en.end - midpoint));
+                const bestDist = Math.min(Math.abs(best.start - midpoint), Math.abs(best.end - midpoint));
+                return dist < bestDist ? en : best;
+            }, currentSubtitles[0]);
+        return { start: enCue.start, end: enCue.end, text: arCue.text };
+    });
+
+    console.log(`%c[E-Joy] 🔁 Arabic timestamps aligned to English (${aligned.length} cues synced)`, 'color: #ffd54f; font-weight: bold;');
+    return aligned;
+}
+
 function parseTextTracks(videoElement) {
-    if (window.location.href.includes('coursera.org') && subtitlesSource === 'coursera-transcript') return;
+    if (isCoursera() && subtitlesSource === 'coursera-transcript') return;
     if (!videoElement || !videoElement.textTracks || videoElement.textTracks.length === 0) return;
     let enTrack = null;
     let arTrack = null;
-    const forceArFromEn = window.location.href.includes('coursera.org');
     for (let i = 0; i < videoElement.textTracks.length; i++) {
         const track = videoElement.textTracks[i];
         if (track.language.startsWith('en') || track.label.toLowerCase().includes('english')) {
@@ -1164,17 +1207,15 @@ function parseTextTracks(videoElement) {
                     });
                 }
 
-                // Use original cues directly (no splitting)
                 const extractedSubs = rawSubs;
-
                 currentSubtitles = extractedSubs.map(s => ({ ...s, translation: '---' }));
                 isSubtitlesLoaded = true;
                 subtitlesSource = 'texttrack';
                 console.log('%c[E-Joy] 🇬🇧 ENGLISH loaded — Source: TextTrack API (' + currentSubtitles.length + ' cues)', 'color: #4fc3f7; font-weight: bold;');
                 if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
 
-                if (!forceArFromEn && arTrack) {
-                    // Try to load Arabic from textTracks (non-Coursera)
+                if (arTrack) {
+                    // Try to load Arabic from textTracks
                     if (arTrack.mode === 'disabled') arTrack.mode = 'hidden';
                     setTimeout(() => {
                         if (arTrack.cues && arTrack.cues.length > 0) {
@@ -1183,17 +1224,29 @@ function parseTextTracks(videoElement) {
                                 const c = arTrack.cues[j];
                                 arCues.push({ start: c.startTime, end: c.endTime, text: c.text.replace(/<[^>]+>/g, '').trim() });
                             }
-                            currentArabicSubtitles = arCues;
+                            // Align Arabic timing to English for consistency
+                            currentArabicSubtitles = alignArabicToEnglish(arCues);
+                            arabicFromNetworkReceived = true;
                             console.log('%c[E-Joy] 🇸🇦 ARABIC loaded — Source: TextTrack API (' + arCues.length + ' cues)', 'color: #81c784; font-weight: bold;');
                             if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
-                        } else {
-                            // No Arabic track available → batch translate via backend
-                            batchTranslateSubtitles(extractedSubs);
+                        } else if (!arabicFromNetworkReceived) {
+                            // No Arabic track → Coursera: API fallback, YouTube: wait for network
+                            if (isCoursera()) {
+                                console.log('[E-Joy] Coursera: No Arabic TextTrack, using API translation fallback');
+                                batchTranslateSubtitles(extractedSubs);
+                            } else {
+                                console.log('[E-Joy] YouTube: No Arabic TextTrack, waiting for network intercept (no API)');
+                            }
                         }
                     }, 300);
-                } else {
-                    // Coursera (or no Arabic track): keep Arabic timing identical to English
-                    batchTranslateSubtitles(extractedSubs);
+                } else if (!arabicFromNetworkReceived) {
+                    // No Arabic track at all
+                    if (isCoursera()) {
+                        console.log('[E-Joy] Coursera: No Arabic track found, using API translation fallback');
+                        batchTranslateSubtitles(extractedSubs);
+                    } else {
+                        console.log('[E-Joy] YouTube: No Arabic track found, waiting for network intercept (no API)');
+                    }
                 }
             } else if (!isSubtitlesLoaded) {
                 setTimeout(tryLoad, 500);
@@ -1269,39 +1322,43 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
         const subUrl = message.payload.url.toLowerCase();
         console.log("[E-Joy] Message Received. URL:", subUrl);
         try {
-            const forceArFromEn = window.location.href.includes('coursera.org');
             // Smart Language Detection
             const urlParams = new URLSearchParams(subUrl.split('?')[1] || '');
             const lang = urlParams.get('lang') || '';
             const tlang = urlParams.get('tlang') || '';
 
             // Determine subtitle type
-            // - Arabic: lang=ar, OR lang=en with tlang=ar (YouTube machine translation to Arabic)
-            // - English: lang=en with no tlang, or tlang=en
-            // - SKIP: any other tlang (e.g. tlang=vi = Vietnamese) to avoid wrong text in English box
             let isArabic = lang === 'ar' || (lang === 'en' && tlang === 'ar') || tlang === 'ar';
             let isEnglish = !isArabic && (lang === 'en' && (tlang === '' || tlang === 'en'));
 
-            // Also handle non-YouTube patterns (.ar., _ar., etc.)
-            if (!isArabic && !isEnglish) {
-                if (subUrl.includes('.ar.') || subUrl.includes('_ar.')) isArabic = true;
-                else if (subUrl.includes('.en.') || subUrl.includes('_en.')) isEnglish = true;
+            // Check the isArabicProbe flag from background.js (for Coursera VTT fetches)
+            if (!isArabic && !isEnglish && message.payload.isArabicProbe !== undefined) {
+                if (message.payload.isArabicProbe) isArabic = true;
+                else isEnglish = true;
             }
 
-            // Skip irrelevant languages
+            // Handle non-YouTube patterns (.ar., _ar., /ar/, etc.)
             if (!isArabic && !isEnglish) {
-                console.log(`[E-Joy] Skipping irrelevant language: lang=${lang}, tlang=${tlang}`);
-                return;
+                if (subUrl.includes('.ar.') || subUrl.includes('_ar.') || subUrl.includes('/ar/') || subUrl.includes('arabic')) isArabic = true;
+                else if (subUrl.includes('.en.') || subUrl.includes('_en.') || subUrl.includes('/en/') || subUrl.includes('english')) isEnglish = true;
+            }
+
+            // If still can't determine, default to English for VTT, skip others
+            if (!isArabic && !isEnglish) {
+                if (subUrl.includes('.vtt')) {
+                    isEnglish = true;
+                } else {
+                    console.log(`[E-Joy] Skipping irrelevant language: lang=${lang}, tlang=${tlang}`);
+                    return;
+                }
             }
 
             console.log(`[E-Joy] Identified as: ${isArabic ? 'ARABIC' : 'ENGLISH'} (lang=${lang}, tlang=${tlang})`);
 
-            if (forceArFromEn && isArabic) {
-                console.log('[E-Joy] Coursera: ignoring Arabic track to keep timing aligned with English');
-                return;
-            }
-            if (forceArFromEn && isEnglish && subtitlesSource === 'coursera-transcript') {
-                console.log('[E-Joy] Coursera: keeping transcript as primary timing source');
+            // On Coursera, if we already have transcript as source and English arrives from network,
+            // keep the transcript source but still accept Arabic from network
+            if (isCoursera() && isEnglish && subtitlesSource === 'coursera-transcript') {
+                console.log('[E-Joy] Coursera: keeping transcript as primary English source, but will accept Arabic from network');
                 return;
             }
 
@@ -1322,38 +1379,43 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
 
             if (parsedNewCues.length > 0) {
                 if (isArabic) {
-                    console.log('%c[E-Joy] 🇸🇦 ARABIC loaded — Source: Background Network Intercept (YouTube track)', 'color: #81c784; font-weight: bold;');
-                    // Align Arabic timestamps to English to ensure perfect sync.
-                    // YouTube's Arabic auto-translated track has slightly different timestamps.
+                    console.log('%c[E-Joy] 🇸🇦 ARABIC loaded — Source: Network Intercept', 'color: #81c784; font-weight: bold;');
+                    arabicFromNetworkReceived = true;
+
+                    // Align Arabic timestamps to English for perfect sync
                     if (currentSubtitles.length > 0) {
-                        // Build a map: for each Arabic cue, find the English cue that has the most overlap
-                        const aligned = parsedNewCues.map(arCue => {
-                            const midpoint = (arCue.start + arCue.end) / 2;
-                            // Find English cue whose interval contains the midpoint of the Arabic cue
-                            const enCue = currentSubtitles.find(en => midpoint >= en.start && midpoint <= en.end)
-                                || currentSubtitles.reduce((best, en) => {
-                                    const dist = Math.min(Math.abs(en.start - midpoint), Math.abs(en.end - midpoint));
-                                    const bestDist = Math.min(Math.abs(best.start - midpoint), Math.abs(best.end - midpoint));
-                                    return dist < bestDist ? en : best;
-                                }, currentSubtitles[0]);
-                            return { start: enCue.start, end: enCue.end, text: arCue.text };
-                        });
-                        currentArabicSubtitles = aligned;
-                        console.log(`%c[E-Joy] 🔁 Arabic timestamps re-aligned to English (${aligned.length} cues synced)`, 'color: #ffd54f; font-weight: bold;');
+                        currentArabicSubtitles = alignArabicToEnglish(parsedNewCues);
                     } else {
-                        // English not loaded yet — keep Arabic timing as-is, sync will apply when EN arrives
+                        // English not loaded yet — keep Arabic timing as-is, will re-align when EN arrives
                         currentArabicSubtitles = parsedNewCues;
                     }
                 } else {
-                    // Use original cues directly (no splitting)
-                    const splitSubs = parsedNewCues;
-                    console.log(`%c[E-Joy] 🇬🇧 ENGLISH loaded — Source: Background Network Intercept (${splitSubs.length} cues)`, 'color: #4fc3f7; font-weight: bold;');
-                    currentSubtitles = splitSubs.map(s => ({ ...s, translation: '---' }));
+                    // English subtitles from network intercept
+                    console.log(`%c[E-Joy] 🇬🇧 ENGLISH loaded — Source: Network Intercept (${parsedNewCues.length} cues)`, 'color: #4fc3f7; font-weight: bold;');
+                    currentSubtitles = parsedNewCues.map(s => ({ ...s, translation: '---' }));
                     isSubtitlesLoaded = true;
                     subtitlesSource = 'external-track';
-                    // If no Arabic subtitles yet, auto-translate via backend
-                    if (currentArabicSubtitles.length === 0 || forceArFromEn) {
-                        batchTranslateSubtitles(splitSubs);
+
+                    // Re-align Arabic to the newly loaded English if Arabic was loaded first
+                    if (currentArabicSubtitles.length > 0) {
+                        currentArabicSubtitles = alignArabicToEnglish(currentArabicSubtitles);
+                    }
+
+                    // Immediately request Arabic probe from background using the English URL
+                    if (!arabicFromNetworkReceived && currentArabicSubtitles.length === 0) {
+                        console.log('[E-Joy] 🔍 English URL received — requesting Arabic probe from background...');
+                        chrome.runtime.sendMessage({
+                            type: 'EJOY_PROBE_ARABIC',
+                            url: message.payload.url
+                        });
+
+                        // Fallback: if Arabic still hasn't arrived after 6 seconds, use batch translation
+                        setTimeout(() => {
+                            if (!arabicFromNetworkReceived && currentArabicSubtitles.length === 0 && currentSubtitles.length > 0) {
+                                console.log('%c[E-Joy] ⏱️ Arabic probe timed out — falling back to batch Google Translation', 'color: #ffb74d; font-weight: bold;');
+                                batchTranslateSubtitles(currentSubtitles);
+                            }
+                        }, 6000);
                     }
                 }
                 console.log("[E-Joy] Step 2: Independent Sync UI Ready.");
@@ -1520,9 +1582,18 @@ function loadCourseraTranscriptCues(videoElement) {
     currentSubtitles = cues.map(c => ({ ...c, translation: '---' }));
     isSubtitlesLoaded = true;
     subtitlesSource = 'coursera-transcript';
-    currentArabicSubtitles = [];
+
+    // If Arabic came from network, re-align to the new English cues
+    if (arabicFromNetworkReceived && currentArabicSubtitles.length > 0) {
+        currentArabicSubtitles = alignArabicToEnglish(currentArabicSubtitles);
+    } else {
+        // No Arabic from network → use API translation (Coursera only)
+        currentArabicSubtitles = [];
+        console.log('[E-Joy] Coursera: Using API translation for Arabic subtitles');
+        batchTranslateSubtitles(cues);
+    }
+
     console.log(`[E-Joy] Coursera transcript loaded (${cues.length} cues)`);
-    batchTranslateSubtitles(cues);
     if (ejoyForceUpdateCallback) ejoyForceUpdateCallback();
     return true;
 }
